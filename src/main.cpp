@@ -18,6 +18,7 @@
 #include <Adafruit_HTU21DF.h>
 #include <BMP180.h>
 #include <BH1750.h>
+#include <BMP180advanced.h>
 #include <INA226.h>
 
 #ifdef ESP8266
@@ -31,7 +32,11 @@
 #include "config.h"
 
 int ledPin = 16;
+BH1750 lightMeter(0x23); //光照
+Adafruit_HTU21DF htu = Adafruit_HTU21DF();
 int ina226_address[] = {0x41, 0x44}; //{65, 68} 65太阳能板 68电池
+INA226 ina(Wire);
+BMP180advanced myBMP(BMP180_ULTRAHIGHRES);
 
 //时间全局变量
 struct tm timeinfo;
@@ -77,9 +82,6 @@ void tcp_send_ln (String content){ //const char* tag,
   }
   Serial.println(message);
 }
-
-Adafruit_HTU21DF htu = Adafruit_HTU21DF();
-INA226 ina(Wire);
 
 void INA226_check(int address){
   tcp_send_ln("INA226_check address:" + String(address));
@@ -163,7 +165,6 @@ void INA226_check(int address){
     tcp_send_ln(" W");
   }
 }
-
 void INA226_read(int address){
   tcp_send_ln("INA226_read address:" + String(address));
   bool success = ina.begin(address);
@@ -195,7 +196,6 @@ void INA226_read(int address){
     tcp_send_ln("");
   }
 }
-
 void INA226_config(){
   for (int i = 0; i < 2; i++) {
     bool success = ina.begin(ina226_address[i]);
@@ -212,6 +212,79 @@ void INA226_config(){
       ina.calibrate(0.1, 0.5);
     }
   }
+}
+
+void BH1750_read(){
+  tcp_send_ln("BH1750_read..");
+  if (lightMeter.measurementReady()) {
+    float lux = lightMeter.readLightLevel();
+    tcp_send_ln("Light:\t" + String(lux) + " lx");
+  }else{
+    tcp_send_ln("BH1750 error");
+    delay(500);
+  }
+  tcp_send_ln("");
+}
+
+void HTU21D_read(){
+  tcp_send_ln("HTU21D_read..");
+  if (htu.begin()) {
+    float temp = htu.readTemperature();
+    float rel_hum = htu.readHumidity();
+    float dew_point = temp - (100 - rel_hum) / 5; //计算露点
+    tcp_send_ln("temp:\t" + String(temp));
+    tcp_send_ln("hum:\t" + String(rel_hum));
+    tcp_send_ln("dp:\t" + String(dew_point));
+  }else{
+    tcp_send_ln("HTU21D error");
+  }
+  tcp_send_ln("");
+}
+
+void BMP180_read(){
+  tcp_send_ln("BMP180_read..");
+  if(myBMP.begin()){
+    tcp_send_ln("Temp:\t"+ String(myBMP.getTemperature(), 1) + " +-1.0C");
+    tcp_send_ln("Pa:\t"  + String(myBMP.getPressure())       + " +-100Pa");
+
+    tcp_send_ln("hPa:\t"  + String(myBMP.getPressure_hPa())  + " +-1hPa");
+    tcp_send_ln("mmHg:\t" + String(myBMP.getPressure_mmHg()) + " +-0.75mmHg");
+    tcp_send_ln("inHg:\t" + String(myBMP.getPressure_inHg()) + " +-0.03inHg");
+
+    tcp_send_ln("SeaLevel hPa:\t"  + String(myBMP.getSeaLevelPressure_hPa(25))  + " hPa");
+    tcp_send_ln("SeaLevel mmHg:\t" + String(myBMP.getSeaLevelPressure_mmHg(25)) + " mmHg");
+    tcp_send_ln("SeaLevel inHg:\t" + String(myBMP.getSeaLevelPressure_inHg(25)) + " inHg");
+
+    switch (myBMP.getForecast(25))
+    {
+      case 0:
+        tcp_send_ln(F("thunderstorm"));
+        break;
+
+      case 1:
+        tcp_send_ln(F("rain"));
+        break;
+
+      case 2:
+        tcp_send_ln(F("cloudy"));
+        break;
+
+      case 3:
+        tcp_send_ln(F("partly cloudy"));
+        break;
+
+      case 4:
+        tcp_send_ln(F("clear"));
+        break;
+
+      case 5:
+        tcp_send_ln(F("sunny"));
+        break;
+    }
+  }else{
+    tcp_send_ln("BMP180 error");
+  }
+  tcp_send_ln("");
 }
 
 void i2c_Scanning() {
@@ -394,6 +467,11 @@ void setup() {
     tcp_send("HTU21D error");
     delay(500);
   }
+////////////////////////////////// BH1750 ////
+  if (!lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
+    tcp_send("BH1750 error");
+    delay(500);
+  }
 
   // i2c_Scanning();
 
@@ -426,11 +504,6 @@ void loop() {
   tcp_send_ln("================ Version: " + String(VER) + " ================");
 
   i2c_Scanning();
-
-  if (!htu.begin()) {
-    //Serial.println("HTU21D error");
-    tcp_send_ln("HTU21D error");
-  }
 
   //Serial.print("Delay & Check Updates");
   tcp_send("Delay & Check Updates");
@@ -472,21 +545,15 @@ void loop() {
       timeStr[len - 1] = '\0';
   }
   
-  String printStr = "Time: " + String(now) + " " + timeStr + "\n";
+  String printStr = "Time: " + String(now) + " " + timeStr;
   //Serial.print(printStr);
-  tcp_send(printStr);
+  tcp_send_ln(printStr);
+  tcp_send_ln("");
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  float temp = htu.readTemperature();
-  float rel_hum = htu.readHumidity();
-  float dew_point = temp - (100 - rel_hum) / 5; //计算露点
-  //Serial.println("temp:\t" + String(temp));
-  tcp_send_ln("temp:\t" + String(temp));
-  //Serial.println("hum:\t" + String(rel_hum));
-  tcp_send_ln("hum:\t" + String(rel_hum));
-  //Serial.println("dp:\t" + String(dew_point));
-  tcp_send_ln("dp:\t" + String(dew_point));
-
+  HTU21D_read();
+  BMP180_read();
+  BH1750_read();
   // INA226_config();
   // for (int i = 0; i < 2; i++) {
   //   INA226_check(ina226_address[i]);
