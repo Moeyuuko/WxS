@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "G:/PlatformIO"
+		},
+		{
+			"name": "WxS",
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"system_error": "cpp",
+			"string": "cpp"
+		}
+	}
+}
