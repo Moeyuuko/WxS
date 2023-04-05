@@ -43,142 +43,140 @@ BMP180advanced myBMP(BMP180_ULTRAHIGHRES);
 struct tm timeinfo;
 
 // 创建TCP服务器对象
-const int serverPort = 8888;
-WiFiServer server(serverPort);
+// const int serverPort = 8888;
+// WiFiServer server(serverPort);
 
-WiFiClient tcp_client;
+// WiFiClient tcp_client;
 WiFiClient http_client;
 WiFiClient http_client_2;
 
-void hasClient (){
-  // 检查是否有客户端连接
-  if (server.hasClient()) {
-    if (!tcp_client.connected()) {
-      tcp_client = server.available();
-      if (tcp_client) {
-        Serial.println("New client connected");
-        tcp_client.write(String("connection succeeded\n").c_str());
-      }
-    }
-  }
-}
-void tcp_send (String content){
-  char message[100];
-  // 发送数据给客户端
-  if (tcp_client && tcp_client.connected()) {
-    snprintf(message, sizeof(message), "%s", content.c_str());
-    tcp_client.write(message);
-  }
-  Serial.write(message);
-}
-void tcp_send_ln (String content){
-  char message[100];
-  snprintf(message, sizeof(message), "%s\n", content.c_str());
-  // 发送数据给客户端
-  if (tcp_client && tcp_client.connected()) {
-    tcp_client.write(message);
-  }
-  Serial.write(message);
-}
-void tcp_send_only (String content){
-  char message[100];
-  snprintf(message, sizeof(message), "%s\n", content.c_str());
-  // 发送数据给客户端
-  if (tcp_client && tcp_client.connected()) {
-    tcp_client.write(message);
-  }
-}
+// void hasClient (){
+//   // 检查是否有客户端连接
+//   if (server.hasClient()) {
+//     if (!tcp_client.connected()) {
+//       tcp_client = server.available();
+//       if (tcp_client) {
+//         Serial.println("New client connected");
+//         tcp_client.write(String("connection succeeded\n").c_str());
+//       }
+//     }
+//   }
+// }
+// void tcp_send (String content){
+//   char message[100];
+//   snprintf(message, sizeof(message), "%s", content.c_str());
+//   // 发送数据给客户端
+//   if (tcp_client && tcp_client.connected()) {
+//     tcp_client.write(message);
+//   }
+//   Serial.write(message);
+// }
+// void tcp_send_ln (String content){
+//   char message[100];
+//   snprintf(message, sizeof(message), "%s\n", content.c_str());
+//   // 发送数据给客户端
+//   if (tcp_client && tcp_client.connected()) {
+//     tcp_client.write(message);
+//   }
+//   Serial.write(message);
+// }
+// void tcp_send_only (String content){
+//   char message[100];
+//   snprintf(message, sizeof(message), "%s", content.c_str());
+//   // 发送数据给客户端
+//   if (tcp_client && tcp_client.connected()) {
+//     tcp_client.write(message);
+//   }
+// }
 
 void INA226_check(int address){
-  tcp_send_ln("INA226_check address:" + String(address));
+  Serial.println("INA226_check address:" + String(address));
   bool success = ina.begin(address);
   if(!success)
   {
-    //Serial.println("INA226 error");
-    tcp_send_ln("INA226 error");
+    Serial.println("INA226 error");
     delay(500);
   }else{
-    tcp_send("Mode:                  ");
+    Serial.print("Mode:                  ");
     switch (ina.getMode())
     {
-      case INA226_MODE_POWER_DOWN:      tcp_send_ln("Power-Down"); break;
-      case INA226_MODE_SHUNT_TRIG:      tcp_send_ln("Shunt Voltage, Triggered"); break;
-      case INA226_MODE_BUS_TRIG:        tcp_send_ln("Bus Voltage, Triggered"); break;
-      case INA226_MODE_SHUNT_BUS_TRIG:  tcp_send_ln("Shunt and Bus, Triggered"); break;
-      case INA226_MODE_ADC_OFF:         tcp_send_ln("ADC Off"); break;
-      case INA226_MODE_SHUNT_CONT:      tcp_send_ln("Shunt Voltage, Continuous"); break;
-      case INA226_MODE_BUS_CONT:        tcp_send_ln("Bus Voltage, Continuous"); break;
-      case INA226_MODE_SHUNT_BUS_CONT:  tcp_send_ln("Shunt and Bus, Continuous"); break;
-      default: tcp_send_ln("unknown");
+      case INA226_MODE_POWER_DOWN:      Serial.println("Power-Down"); break;
+      case INA226_MODE_SHUNT_TRIG:      Serial.println("Shunt Voltage, Triggered"); break;
+      case INA226_MODE_BUS_TRIG:        Serial.println("Bus Voltage, Triggered"); break;
+      case INA226_MODE_SHUNT_BUS_TRIG:  Serial.println("Shunt and Bus, Triggered"); break;
+      case INA226_MODE_ADC_OFF:         Serial.println("ADC Off"); break;
+      case INA226_MODE_SHUNT_CONT:      Serial.println("Shunt Voltage, Continuous"); break;
+      case INA226_MODE_BUS_CONT:        Serial.println("Bus Voltage, Continuous"); break;
+      case INA226_MODE_SHUNT_BUS_CONT:  Serial.println("Shunt and Bus, Continuous"); break;
+      default: Serial.println("unknown");
     }
     
-    tcp_send("Samples average:       ");
+    Serial.print("Samples average:       ");
     switch (ina.getAverages())
     {
-      case INA226_AVERAGES_1:           tcp_send_ln("1 sample"); break;
-      case INA226_AVERAGES_4:           tcp_send_ln("4 samples"); break;
-      case INA226_AVERAGES_16:          tcp_send_ln("16 samples"); break;
-      case INA226_AVERAGES_64:          tcp_send_ln("64 samples"); break;
-      case INA226_AVERAGES_128:         tcp_send_ln("128 samples"); break;
-      case INA226_AVERAGES_256:         tcp_send_ln("256 samples"); break;
-      case INA226_AVERAGES_512:         tcp_send_ln("512 samples"); break;
-      case INA226_AVERAGES_1024:        tcp_send_ln("1024 samples"); break;
-      default: tcp_send_ln("unknown");
+      case INA226_AVERAGES_1:           Serial.println("1 sample"); break;
+      case INA226_AVERAGES_4:           Serial.println("4 samples"); break;
+      case INA226_AVERAGES_16:          Serial.println("16 samples"); break;
+      case INA226_AVERAGES_64:          Serial.println("64 samples"); break;
+      case INA226_AVERAGES_128:         Serial.println("128 samples"); break;
+      case INA226_AVERAGES_256:         Serial.println("256 samples"); break;
+      case INA226_AVERAGES_512:         Serial.println("512 samples"); break;
+      case INA226_AVERAGES_1024:        Serial.println("1024 samples"); break;
+      default: Serial.println("unknown");
     }
 
-    tcp_send("Bus conversion time:   ");
+    Serial.print("Bus conversion time:   ");
     switch (ina.getBusConversionTime())
     {
-      case INA226_BUS_CONV_TIME_140US:  tcp_send_ln("140uS"); break;
-      case INA226_BUS_CONV_TIME_204US:  tcp_send_ln("204uS"); break;
-      case INA226_BUS_CONV_TIME_332US:  tcp_send_ln("332uS"); break;
-      case INA226_BUS_CONV_TIME_588US:  tcp_send_ln("558uS"); break;
-      case INA226_BUS_CONV_TIME_1100US: tcp_send_ln("1.100ms"); break;
-      case INA226_BUS_CONV_TIME_2116US: tcp_send_ln("2.116ms"); break;
-      case INA226_BUS_CONV_TIME_4156US: tcp_send_ln("4.156ms"); break;
-      case INA226_BUS_CONV_TIME_8244US: tcp_send_ln("8.244ms"); break;
-      default: tcp_send_ln("unknown");
+      case INA226_BUS_CONV_TIME_140US:  Serial.println("140uS"); break;
+      case INA226_BUS_CONV_TIME_204US:  Serial.println("204uS"); break;
+      case INA226_BUS_CONV_TIME_332US:  Serial.println("332uS"); break;
+      case INA226_BUS_CONV_TIME_588US:  Serial.println("558uS"); break;
+      case INA226_BUS_CONV_TIME_1100US: Serial.println("1.100ms"); break;
+      case INA226_BUS_CONV_TIME_2116US: Serial.println("2.116ms"); break;
+      case INA226_BUS_CONV_TIME_4156US: Serial.println("4.156ms"); break;
+      case INA226_BUS_CONV_TIME_8244US: Serial.println("8.244ms"); break;
+      default: Serial.println("unknown");
     }
 
-    tcp_send("Shunt conversion time: ");
+    Serial.print("Shunt conversion time: ");
     switch (ina.getShuntConversionTime())
     {
-      case INA226_SHUNT_CONV_TIME_140US:  tcp_send_ln("140uS"); break;
-      case INA226_SHUNT_CONV_TIME_204US:  tcp_send_ln("204uS"); break;
-      case INA226_SHUNT_CONV_TIME_332US:  tcp_send_ln("332uS"); break;
-      case INA226_SHUNT_CONV_TIME_588US:  tcp_send_ln("558uS"); break;
-      case INA226_SHUNT_CONV_TIME_1100US: tcp_send_ln("1.100ms"); break;
-      case INA226_SHUNT_CONV_TIME_2116US: tcp_send_ln("2.116ms"); break;
-      case INA226_SHUNT_CONV_TIME_4156US: tcp_send_ln("4.156ms"); break;
-      case INA226_SHUNT_CONV_TIME_8244US: tcp_send_ln("8.244ms"); break;
-      default: tcp_send_ln("unknown");
+      case INA226_SHUNT_CONV_TIME_140US:  Serial.println("140uS"); break;
+      case INA226_SHUNT_CONV_TIME_204US:  Serial.println("204uS"); break;
+      case INA226_SHUNT_CONV_TIME_332US:  Serial.println("332uS"); break;
+      case INA226_SHUNT_CONV_TIME_588US:  Serial.println("558uS"); break;
+      case INA226_SHUNT_CONV_TIME_1100US: Serial.println("1.100ms"); break;
+      case INA226_SHUNT_CONV_TIME_2116US: Serial.println("2.116ms"); break;
+      case INA226_SHUNT_CONV_TIME_4156US: Serial.println("4.156ms"); break;
+      case INA226_SHUNT_CONV_TIME_8244US: Serial.println("8.244ms"); break;
+      default: Serial.println("unknown");
     }
     
-    tcp_send("Max possible current:  ");
-    tcp_send(String(ina.getMaxPossibleCurrent()));
-    tcp_send_ln(" A");
+    Serial.print("Max possible current:  ");
+    Serial.print(String(ina.getMaxPossibleCurrent()));
+    Serial.println(" A");
 
-    tcp_send("Max current:           ");
-    tcp_send(String(ina.getMaxCurrent()));
-    tcp_send_ln(" A");
+    Serial.print("Max current:           ");
+    Serial.print(String(ina.getMaxCurrent()));
+    Serial.println(" A");
 
-    tcp_send("Max shunt voltage:     ");
-    tcp_send(String(ina.getMaxShuntVoltage()));
-    tcp_send_ln(" V");
+    Serial.print("Max shunt voltage:     ");
+    Serial.print(String(ina.getMaxShuntVoltage()));
+    Serial.println(" V");
 
-    tcp_send("Max power:             ");
-    tcp_send(String(ina.getMaxPower()));
-    tcp_send_ln(" W");
+    Serial.print("Max power:             ");
+    Serial.print(String(ina.getMaxPower()));
+    Serial.println(" W");
   }
 }
 String INA226_read(int timestamp,int address){
-  tcp_send_ln("INA226_read address:" + String(address));
+  Serial.println("INA226_read address:" + String(address));
   String result = "";
   bool success = ina.begin(address);
   if(!success)
   {
-    //Serial.println("INA226 error");
-    tcp_send_ln("INA226 error");
+    Serial.println("INA226 error");
     delay(500);
   }else{
     String Busvoltage = String (ina.readBusVoltage(), 5);
@@ -186,22 +184,22 @@ String INA226_read(int timestamp,int address){
     String ShuntVoltage = String (ina.readShuntVoltage(), 5);
     String ShuntCurrent = String (ina.readShuntCurrent(), 5);
 
-    tcp_send("Bus voltage:   ");
-    tcp_send(Busvoltage);
-    tcp_send_ln(" V");
+    Serial.print("Bus voltage:   ");
+    Serial.print(Busvoltage);
+    Serial.println(" V");
 
-    tcp_send("Bus power:     ");
-    tcp_send(BusPower);
-    tcp_send_ln(" W");
+    Serial.print("Bus power:     ");
+    Serial.print(BusPower);
+    Serial.println(" W");
 
 
-    tcp_send("Shunt voltage: ");
-    tcp_send(ShuntVoltage);
-    tcp_send_ln(" V");
+    Serial.print("Shunt voltage: ");
+    Serial.print(ShuntVoltage);
+    Serial.println(" V");
 
-    tcp_send("Shunt current: ");
-    tcp_send(ShuntCurrent);
-    tcp_send_ln(" A");
+    Serial.print("Shunt current: ");
+    Serial.print(ShuntCurrent);
+    Serial.println(" A");
     
     //{0x41, 0x44} {65, 68} 65太阳能板 68电池
     String type;
@@ -220,17 +218,16 @@ String INA226_read(int timestamp,int address){
                 ;
     }
   }
-  tcp_send_ln("");
+  Serial.println("");
   return result;
 }
 void INA226_config(){
   for (int i = 0; i < 2; i++) {
     bool success = ina.begin(ina226_address[i]);
-    tcp_send_ln("INA226_config address:" + String(ina226_address[i]));
+    Serial.println("INA226_config address:" + String(ina226_address[i]));
     if(!success)
     {
-      //Serial.println("INA226 error");
-      tcp_send_ln("INA226 error");
+      Serial.println("INA226 error");
       delay(500);
     }else{
       // Configure INA226
@@ -242,79 +239,79 @@ void INA226_config(){
 }
 
 String BH1750_read(int timestamp){
-  tcp_send_ln("BH1750_read..");
+  Serial.println("BH1750_read..");
   String result = "";
   if (lightMeter.measurementReady()) {
     float lux = lightMeter.readLightLevel();
     if(lux>=0){
-      tcp_send_ln("Light:\t" + String(lux) + " lx");
+      Serial.println("Light:\t" + String(lux) + " lx");
       result = "Weather,tag=Brightness Brightness=" + String(lux) + " " + timestamp + "\n";
     }else{
-      tcp_send_ln("BH1750 error Light: " + String(lux) + " lx");
+      Serial.println("BH1750 error Light: " + String(lux) + " lx");
     }
   }else{
-    tcp_send_ln("BH1750 error");
+    Serial.println("BH1750 error");
     delay(500);
   }
-  tcp_send_ln("");
+  Serial.println("");
   return result;
 }
 
 String HTU21D_read(int timestamp){
-  tcp_send_ln("HTU21D_read..");
+  Serial.println("HTU21D_read..");
   String result = "";
   if (htu.begin()) {
     float temp = htu.readTemperature();
     float rel_hum = htu.readHumidity();
     float dew_point = temp - (100 - rel_hum) / 5; //计算露点
-    tcp_send_ln("temp:\t" + String(temp));
-    tcp_send_ln("hum:\t" + String(rel_hum));
-    tcp_send_ln("dp:\t" + String(dew_point));
+    Serial.println("temp:\t" + String(temp));
+    Serial.println("hum:\t" + String(rel_hum));
+    Serial.println("dp:\t" + String(dew_point));
     result = "Weather,tag=Temperature Temperature=" + String(temp) + " " + timestamp + "\n" +
                     "Weather,tag=Humidity Humidity=" + String(rel_hum) + " " + timestamp + "\n" +
                     "Weather,tag=dewpoint dewpoint=" + String(dew_point) + " " + timestamp + "\n"
                     ;
   }else{
-    tcp_send_ln("HTU21D error");
+    Serial.println("HTU21D error");
   }
-  tcp_send_ln("");
+  Serial.println("");
   return result;
 }
 
 String BMP180_read(int timestamp){
-  tcp_send_ln("BMP180_read..");
+  Serial.println("BMP180_read..");
   String result = "";
   if(myBMP.begin()){
-    tcp_send_ln("Temp:\t"+ String(myBMP.getTemperature(), 1) + " +-1.0C");
-    tcp_send_ln("Pa:\t"  + String(myBMP.getPressure())       + " +-100Pa");
+    Serial.println("Temp:\t"+ String(myBMP.getTemperature(), 1) + " +-1.0C");
+    Serial.println("Pa:\t"  + String(myBMP.getPressure())       + " +-100Pa");
 
     String Pressure_hPa = String(myBMP.getPressure_hPa());
-    tcp_send_ln("hPa:\t"  + Pressure_hPa + " +-1hPa");
-    tcp_send_ln("mmHg:\t" + String(myBMP.getPressure_mmHg()) + " +-0.75mmHg");
-    tcp_send_ln("inHg:\t" + String(myBMP.getPressure_inHg()) + " +-0.03inHg");
+    Serial.println("hPa:\t"  + Pressure_hPa + " +-1hPa");
+    Serial.println("mmHg:\t" + String(myBMP.getPressure_mmHg()) + " +-0.75mmHg");
+    Serial.println("inHg:\t" + String(myBMP.getPressure_inHg()) + " +-0.03inHg");
 
-    tcp_send_ln("SeaLevel hPa:\t"  + String(myBMP.getSeaLevelPressure_hPa(25))  + " hPa");
-    tcp_send_ln("SeaLevel mmHg:\t" + String(myBMP.getSeaLevelPressure_mmHg(25)) + " mmHg");
-    tcp_send_ln("SeaLevel inHg:\t" + String(myBMP.getSeaLevelPressure_inHg(25)) + " inHg");
+    Serial.println("SeaLevel hPa:\t"  + String(myBMP.getSeaLevelPressure_hPa(25))  + " hPa");
+    Serial.println("SeaLevel mmHg:\t" + String(myBMP.getSeaLevelPressure_mmHg(25)) + " mmHg");
+    Serial.println("SeaLevel inHg:\t" + String(myBMP.getSeaLevelPressure_inHg(25)) + " inHg");
 
     int Forecast = myBMP.getForecast(25);
     switch (Forecast)
     {
-      case 0: tcp_send_ln(F("thunderstorm")); break;
-      case 1: tcp_send_ln(F("rain")); break;
-      case 2: tcp_send_ln(F("cloudy")); break;
-      case 3: tcp_send_ln(F("partly cloudy")); break;
-      case 4: tcp_send_ln(F("clear")); break;
-      case 5: tcp_send_ln(F("sunny")); break;
+      case 0: Serial.println(F("thunderstorm")); break;
+      case 1: Serial.println(F("rain")); break;
+      case 2: Serial.println(F("cloudy")); break;
+      case 3: Serial.println(F("partly cloudy")); break;
+      case 4: Serial.println(F("clear")); break;
+      case 5: Serial.println(F("sunny")); break;
     }
 
     result = "Weather,tag=Pressure Pressure=" + Pressure_hPa + " " + timestamp + "\n" +
              "Weather,tag=Forecast Forecast=" + Forecast + " " + timestamp + "\n"
              ;
   }else{
-    tcp_send_ln("BMP180 error");
+    Serial.println("BMP180 error");
   }
-  tcp_send_ln("");
+  Serial.println("");
   return result;
 }
 
@@ -322,8 +319,7 @@ void i2c_Scanning() {
   byte error, address;
   int deviceCount = 0;
 
-  //Serial.println("Scanning...");
-  tcp_send_ln("Scanning...");
+  Serial.println("Scanning...");
 
   for (address = 1; address < 127; address++) {
     char hexValue[3];
@@ -331,35 +327,26 @@ void i2c_Scanning() {
     error = Wire.endTransmission();
 
     if (error == 0) {
-      //Serial.print("Device found at address 0x");
-      tcp_send("Device found at address 0x");
+      Serial.print("Device found at address 0x");
       if (address < 16) {
-        //Serial.print("0");
-        tcp_send("0");
+        Serial.print("0");
       }
       sprintf(hexValue, "%02X", address);
-      //Serial.println(hexValue);
-      tcp_send_ln(String(hexValue));
-
+      Serial.println(hexValue);
       deviceCount++;
     } else if (error == 4) {
-      //Serial.print("Unknown error at address 0x");
-      tcp_send("Unknown error at address 0x");
+      Serial.print("Unknown error at address 0x");
       if (address < 16) {
-        //Serial.print("0");
-        tcp_send("0");
+        Serial.print("0");
       }
       sprintf(hexValue, "%02X", address);
-      //Serial.println(hexValue);
-      tcp_send_ln(String(hexValue));
+      Serial.println(hexValue);
     }
   }
   if (deviceCount == 0) {
-    //Serial.println("No I2C devices found\n");
-    tcp_send_ln("No I2C devices found\n");
+    Serial.println("No I2C devices found\n");
   } else {
-    //Serial.println("Scan complete\n");
-    tcp_send_ln("Scan complete\n");
+    Serial.println("Scan complete\n");
   }
 }
 
@@ -403,8 +390,6 @@ void setup() {
     }
 
     // NOTE: if updating FS this would be the place to unmount FS using FS.end()
-    tcp_send_ln("|--Start updating--|" + type);
-    tcp_client.stop();
     Serial.println("|--Start updating--|" + type);
   });
   ArduinoOTA.onEnd([]() {
@@ -449,20 +434,19 @@ void setup() {
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
   ///////////////////////////////////////// TCP SERVER ////
-  server.begin();
-  Serial.print("Server started on port ");
-  Serial.println(serverPort);
+  // server.begin();
+  // Serial.print("Server started on port ");
+  // Serial.println(serverPort);
 
 
   for (int i = 0; i < 20; i++) {
     Serial.print("Check Updates|");
-    hasClient ();
-    tcp_send_only("Check Updates|");
+    // hasClient ();
     ArduinoOTA.handle();
     delay(500);
   }
   Serial.println("");
-  tcp_send_ln("");
+  Serial.println("");
 
 
   //////////////////////////////////////////// NTP ////
@@ -470,21 +454,16 @@ void setup() {
   configTime(8 * 3600, 0, "ntp.ntsc.ac.cn", "ntp.aliyun.com");
 
   Serial.print("Waiting for NTP time sync: ");
-  tcp_send_only("Waiting for NTP time sync: ");
   time_t now = time(nullptr);
   while (now < 8 * 3600 * 2) {
     delay(500);
     Serial.print(".");
-    tcp_send_only(".");
     now = time(nullptr);
   }
-  //Serial.println("");
-  tcp_send_ln("");
+  Serial.println("");
   struct tm timeinfo;
   localtime_r(&now, &timeinfo);
-  //Serial.print("Current time: ");
-  //Serial.println(asctime(&timeinfo));
-  tcp_send_ln("Current time: " + String (asctime(&timeinfo)));
+  Serial.println("Current time: " + String (asctime(&timeinfo)));
 
   Wire.begin();
 ////////////////////////////////// INA226 ////
@@ -494,13 +473,12 @@ void setup() {
   }
 ////////////////////////////////// HTU21D ////
   if (!htu.begin()) {
-    //Serial.println("HTU21D error");
-    tcp_send("HTU21D error");
+    Serial.print("HTU21D error");
     delay(500);
   }
 ////////////////////////////////// BH1750 ////
   if (!lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
-    tcp_send("BH1750 error");
+    Serial.print("BH1750 error");
     delay(500);
   }
 
@@ -531,24 +509,20 @@ void loop() {
     delay(100);
   }
 
-  //Serial.println("================ Version: " + String(VER) + " ================");
-  tcp_send_ln("================ Version: " + String(VER) + " ================");
+  Serial.println("================ Version: " + String(VER) + " ================");
 
   i2c_Scanning();
 
   Serial.print("Delay & Check Updates");
-  tcp_send_only("Delay & Check Updates");
-  for (int i = 0; i < 60; i++) {
+  for (int i = 0; i < 30; i++) {
     Serial.print(".");
-    tcp_send_only(".");
-    hasClient ();
+    // hasClient ();
     ArduinoOTA.handle();
     delay(1000);
   }
   // delay(10000);
 
-  //Serial.println("execute");
-  tcp_send_ln("execute");
+  Serial.println("execute");
   
   for (int i = 0; i < 1; i++) {
     digitalWrite(ledPin, LOW);
@@ -577,9 +551,8 @@ void loop() {
   }
   
   String printStr = "Time: " + String(now) + " " + timeStr;
-  //Serial.print(printStr);
-  tcp_send_ln(printStr);
-  tcp_send_ln("");
+  Serial.println(printStr);
+  Serial.println("");
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   String postData = "";
@@ -590,14 +563,8 @@ void loop() {
   String INA226_41 = INA226_read(now,0x41);
   String INA226_44 = INA226_read(now,0x44);
 
-  // tcp_send(HTU21D_Data);
-  // tcp_send(BMP180_Data);
-  // tcp_send(BH1750_Data);
-  // tcp_send(INA226_41);
-  // tcp_send(INA226_44);
-
   postData = HTU21D_Data + BMP180_Data + BH1750_Data + INA226_41 + INA226_44;
-  tcp_send_ln(postData);
+  Serial.println(postData);
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   
@@ -615,16 +582,18 @@ void loop() {
       http_client.println();
       http_client.print(postData);
     } else {
+      Serial.println("Failed to connect to server");
       // Serial.println("Failed to connect to server");
-      tcp_send_ln("Failed to connect to server");
     }
 
-    while (http_client.connected()) {
-      if (http_client.available()) {
-        String line = http_client.readStringUntil('\n');
-        tcp_send_ln(line);
-      }
-    }
+    //与TCP冲突
+
+    // while (http_client.connected()) {
+    //   if (http_client.available()) {
+    //     String line = http_client.readStringUntil('\n');
+    //     Serial.println(line);
+    //   }
+    // }
 
     if (http_client_2.connect(api2_serverName, api2_port)) { // Replace with your server URL and port
       http_client_2.println(String("POST ") + api2_url + " HTTP/1.1"); // Replace with your API endpoint
@@ -635,21 +604,21 @@ void loop() {
       http_client_2.println();
       http_client_2.print(postData);
     } else {
+      Serial.println("Failed to connect to server");
       // Serial.println("Failed to connect to server");
-      tcp_send_ln("Failed to connect to server");
     }
 
-    while (http_client_2.connected()) {
-      if (http_client_2.available()) {
-        String line = http_client_2.readStringUntil('\n');
-        tcp_send_ln(line);
-      }
-    }
+    // while (http_client_2.connected()) {
+    //   if (http_client_2.available()) {
+    //     String line = http_client_2.readStringUntil('\n');
+    //     Serial.println(line);
+    //   }
+    // }
   }
   
-  tcp_send_ln("");
-  tcp_send_ln("=====END=====");
-  tcp_send_ln("");
+  Serial.println("");
+  Serial.println("=====END=====");
+  Serial.println("");
 }
 
 

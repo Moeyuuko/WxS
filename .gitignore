@@ -7,6 +7,9 @@
 note
 .stversions
 
+#配置文件
+src\config.h
+
 # ---> C++
 # Compiled Object files
 *.slo
