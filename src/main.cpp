@@ -375,7 +375,7 @@ void setup() {
   ///////////////////////////////////////////// OTA ////
   ArduinoOTA.setPort(8266);
   ArduinoOTA.setHostname(hostname);
-  ArduinoOTA.setPassword("px6216e3");
+  ArduinoOTA.setPassword(OTAPassword);
 
   // Password can be set with it's md5 value as well
   // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
@@ -514,7 +514,7 @@ void loop() {
   i2c_Scanning();
 
   Serial.print("Delay & Check Updates");
-  for (int i = 0; i < 30; i++) {
+  for (int i = 0; i < loop_delay_Time; i++) {
     Serial.print(".");
     // hasClient ();
     ArduinoOTA.handle();
