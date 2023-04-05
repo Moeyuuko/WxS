@@ -8,7 +8,7 @@ note
 .stversions
 
 #配置文件
-src\config.h
+src/config.h
 
 # ---> C++
 # Compiled Object files
@@ -39,3 +39,4 @@ src\config.h
 *.exe
 *.out
 *.app
+
