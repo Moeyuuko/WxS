@@ -2,8 +2,8 @@
 
 // Device found at address 0x23 // BH1750FVI
 // Device found at address 0x40 // HTU21D
-// Device found at address 0x41 // INA226 []
-// Device found at address 0x44 // INA226 []
+// Device found at address 0x41 // INA226 [65 太阳能板]  {65, 68} 65太阳能板 68电池
+// Device found at address 0x44 // INA226 [68 电池]
 // Device found at address 0x77 // BMP180
 
 // INA226：默认地址为0x40。
@@ -13,6 +13,7 @@
 
 #include <Arduino.h>
 #include <ArduinoOTA.h>
+#include <base64.h>
 
 #include <Wire.h>
 #include <Adafruit_HTU21DF.h>
@@ -47,6 +48,7 @@ WiFiServer server(serverPort);
 
 WiFiClient tcp_client;
 WiFiClient http_client;
+WiFiClient http_client_2;
 
 void hasClient (){
   // 检查是否有客户端连接
@@ -56,31 +58,35 @@ void hasClient (){
       if (tcp_client) {
         Serial.println("New client connected");
         tcp_client.write(String("connection succeeded\n").c_str());
-        
-        // for (int i = 0; i < 2; i++) {
-        //   INA226_check(ina226_address[i]);
-        // }
       }
     }
   }
 }
-void tcp_send (String content){ //const char* tag, 
+void tcp_send (String content){
   char message[100];
   // 发送数据给客户端
   if (tcp_client && tcp_client.connected()) {
     snprintf(message, sizeof(message), "%s", content.c_str());
     tcp_client.write(message);
   }
-  Serial.println(message);
+  Serial.write(message);
 }
-void tcp_send_ln (String content){ //const char* tag, 
+void tcp_send_ln (String content){
   char message[100];
   snprintf(message, sizeof(message), "%s\n", content.c_str());
   // 发送数据给客户端
   if (tcp_client && tcp_client.connected()) {
     tcp_client.write(message);
   }
-  Serial.println(message);
+  Serial.write(message);
+}
+void tcp_send_only (String content){
+  char message[100];
+  snprintf(message, sizeof(message), "%s\n", content.c_str());
+  // 发送数据给客户端
+  if (tcp_client && tcp_client.connected()) {
+    tcp_client.write(message);
+  }
 }
 
 void INA226_check(int address){
@@ -165,8 +171,9 @@ void INA226_check(int address){
     tcp_send_ln(" W");
   }
 }
-void INA226_read(int address){
+String INA226_read(int timestamp,int address){
   tcp_send_ln("INA226_read address:" + String(address));
+  String result = "";
   bool success = ina.begin(address);
   if(!success)
   {
@@ -174,27 +181,47 @@ void INA226_read(int address){
     tcp_send_ln("INA226 error");
     delay(500);
   }else{
+    String Busvoltage = String (ina.readBusVoltage(), 5);
+    String BusPower = String (ina.readBusPower(), 5);
+    String ShuntVoltage = String (ina.readShuntVoltage(), 5);
+    String ShuntCurrent = String (ina.readShuntCurrent(), 5);
+
     tcp_send("Bus voltage:   ");
-    tcp_send(String (ina.readBusVoltage(), 5));
+    tcp_send(Busvoltage);
     tcp_send_ln(" V");
 
     tcp_send("Bus power:     ");
-    tcp_send(String (ina.readBusPower(), 5));
+    tcp_send(BusPower);
     tcp_send_ln(" W");
 
 
     tcp_send("Shunt voltage: ");
-    tcp_send(String (ina.readShuntVoltage(), 5));
+    tcp_send(ShuntVoltage);
     tcp_send_ln(" V");
 
     tcp_send("Shunt current: ");
-    tcp_send(String (ina.readShuntCurrent(), 5));
+    tcp_send(ShuntCurrent);
     tcp_send_ln(" A");
-
     
-
-    tcp_send_ln("");
+    //{0x41, 0x44} {65, 68} 65太阳能板 68电池
+    String type;
+    if (address == 0x41){
+      type = "SolarPanels";
+    }else if (address == 0x44)
+    {
+      type = "Battery";
+    }else{
+      type = "error";
+    }
+    if(type != "error"){
+      result =  type + ",tag=1 Voltage=" + Busvoltage + " " + timestamp + "\n" +
+                type + ",tag=1 Current=" + ShuntCurrent + " " + timestamp + "\n" +
+                type + ",tag=1 watts=" + BusPower + " " + timestamp + "\n"
+                ;
+    }
   }
+  tcp_send_ln("");
+  return result;
 }
 void INA226_config(){
   for (int i = 0; i < 2; i++) {
@@ -214,20 +241,28 @@ void INA226_config(){
   }
 }
 
-void BH1750_read(){
+String BH1750_read(int timestamp){
   tcp_send_ln("BH1750_read..");
+  String result = "";
   if (lightMeter.measurementReady()) {
     float lux = lightMeter.readLightLevel();
-    tcp_send_ln("Light:\t" + String(lux) + " lx");
+    if(lux>=0){
+      tcp_send_ln("Light:\t" + String(lux) + " lx");
+      result = "Weather,tag=Brightness Brightness=" + String(lux) + " " + timestamp + "\n";
+    }else{
+      tcp_send_ln("BH1750 error Light: " + String(lux) + " lx");
+    }
   }else{
     tcp_send_ln("BH1750 error");
     delay(500);
   }
   tcp_send_ln("");
+  return result;
 }
 
-void HTU21D_read(){
+String HTU21D_read(int timestamp){
   tcp_send_ln("HTU21D_read..");
+  String result = "";
   if (htu.begin()) {
     float temp = htu.readTemperature();
     float rel_hum = htu.readHumidity();
@@ -235,19 +270,26 @@ void HTU21D_read(){
     tcp_send_ln("temp:\t" + String(temp));
     tcp_send_ln("hum:\t" + String(rel_hum));
     tcp_send_ln("dp:\t" + String(dew_point));
+    result = "Weather,tag=Temperature Temperature=" + String(temp) + " " + timestamp + "\n" +
+                    "Weather,tag=Humidity Humidity=" + String(rel_hum) + " " + timestamp + "\n" +
+                    "Weather,tag=dewpoint dewpoint=" + String(dew_point) + " " + timestamp + "\n"
+                    ;
   }else{
     tcp_send_ln("HTU21D error");
   }
   tcp_send_ln("");
+  return result;
 }
 
-void BMP180_read(){
+String BMP180_read(int timestamp){
   tcp_send_ln("BMP180_read..");
+  String result = "";
   if(myBMP.begin()){
     tcp_send_ln("Temp:\t"+ String(myBMP.getTemperature(), 1) + " +-1.0C");
     tcp_send_ln("Pa:\t"  + String(myBMP.getPressure())       + " +-100Pa");
 
-    tcp_send_ln("hPa:\t"  + String(myBMP.getPressure_hPa())  + " +-1hPa");
+    String Pressure_hPa = String(myBMP.getPressure_hPa());
+    tcp_send_ln("hPa:\t"  + Pressure_hPa + " +-1hPa");
     tcp_send_ln("mmHg:\t" + String(myBMP.getPressure_mmHg()) + " +-0.75mmHg");
     tcp_send_ln("inHg:\t" + String(myBMP.getPressure_inHg()) + " +-0.03inHg");
 
@@ -255,36 +297,25 @@ void BMP180_read(){
     tcp_send_ln("SeaLevel mmHg:\t" + String(myBMP.getSeaLevelPressure_mmHg(25)) + " mmHg");
     tcp_send_ln("SeaLevel inHg:\t" + String(myBMP.getSeaLevelPressure_inHg(25)) + " inHg");
 
-    switch (myBMP.getForecast(25))
+    int Forecast = myBMP.getForecast(25);
+    switch (Forecast)
     {
-      case 0:
-        tcp_send_ln(F("thunderstorm"));
-        break;
-
-      case 1:
-        tcp_send_ln(F("rain"));
-        break;
-
-      case 2:
-        tcp_send_ln(F("cloudy"));
-        break;
-
-      case 3:
-        tcp_send_ln(F("partly cloudy"));
-        break;
-
-      case 4:
-        tcp_send_ln(F("clear"));
-        break;
-
-      case 5:
-        tcp_send_ln(F("sunny"));
-        break;
+      case 0: tcp_send_ln(F("thunderstorm")); break;
+      case 1: tcp_send_ln(F("rain")); break;
+      case 2: tcp_send_ln(F("cloudy")); break;
+      case 3: tcp_send_ln(F("partly cloudy")); break;
+      case 4: tcp_send_ln(F("clear")); break;
+      case 5: tcp_send_ln(F("sunny")); break;
     }
+
+    result = "Weather,tag=Pressure Pressure=" + Pressure_hPa + " " + timestamp + "\n" +
+             "Weather,tag=Forecast Forecast=" + Forecast + " " + timestamp + "\n"
+             ;
   }else{
     tcp_send_ln("BMP180 error");
   }
   tcp_send_ln("");
+  return result;
 }
 
 void i2c_Scanning() {
@@ -424,9 +455,9 @@ void setup() {
 
 
   for (int i = 0; i < 20; i++) {
-    //Serial.print("|Check Updates");
+    Serial.print("Check Updates|");
     hasClient ();
-    tcp_send("|Check Updates");
+    tcp_send_only("Check Updates|");
     ArduinoOTA.handle();
     delay(500);
   }
@@ -438,13 +469,13 @@ void setup() {
   // Set time via NTP, as required for x.509 validation
   configTime(8 * 3600, 0, "ntp.ntsc.ac.cn", "ntp.aliyun.com");
 
-  //Serial.print("Waiting for NTP time sync: ");
-  tcp_send("Waiting for NTP time sync: ");
+  Serial.print("Waiting for NTP time sync: ");
+  tcp_send_only("Waiting for NTP time sync: ");
   time_t now = time(nullptr);
   while (now < 8 * 3600 * 2) {
     delay(500);
-    //Serial.print(".");
-    tcp_send(".");
+    Serial.print(".");
+    tcp_send_only(".");
     now = time(nullptr);
   }
   //Serial.println("");
@@ -505,11 +536,11 @@ void loop() {
 
   i2c_Scanning();
 
-  //Serial.print("Delay & Check Updates");
-  tcp_send("Delay & Check Updates");
-  for (int i = 0; i < 10; i++) {
-    //Serial.print(".");
-    tcp_send(".");
+  Serial.print("Delay & Check Updates");
+  tcp_send_only("Delay & Check Updates");
+  for (int i = 0; i < 60; i++) {
+    Serial.print(".");
+    tcp_send_only(".");
     hasClient ();
     ArduinoOTA.handle();
     delay(1000);
@@ -551,38 +582,74 @@ void loop() {
   tcp_send_ln("");
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  HTU21D_read();
-  BMP180_read();
-  BH1750_read();
-  // INA226_config();
-  // for (int i = 0; i < 2; i++) {
-  //   INA226_check(ina226_address[i]);
-  // }
-  for (int i = 0; i < 2; i++) {
-    INA226_read(ina226_address[i]);
-  }
+  String postData = "";
+  
+  String HTU21D_Data = HTU21D_read(now);
+  String BMP180_Data = BMP180_read(now);
+  String BH1750_Data = BH1750_read(now);
+  String INA226_41 = INA226_read(now,0x41);
+  String INA226_44 = INA226_read(now,0x44);
+
+  // tcp_send(HTU21D_Data);
+  // tcp_send(BMP180_Data);
+  // tcp_send(BH1750_Data);
+  // tcp_send(INA226_41);
+  // tcp_send(INA226_44);
+
+  postData = HTU21D_Data + BMP180_Data + BH1750_Data + INA226_41 + INA226_44;
+  tcp_send_ln(postData);
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   
-  // if (http_client.connect(api2_serverName, api2_port)) { // Replace with your server URL and port
-  //   String postData  = "hallo"; // POST data
-  //   http_client.println(String("POST ") + api2_url + " HTTP/1.1"); // Replace with your API endpoint
-  //   http_client.println(String("Host: ") + api2_serverName); // Replace with your server URL
-  //   http_client.println("Content-Type: application/x-www-form-urlencoded");
-  //   http_client.print("Content-Length: ");
-  //   http_client.println(postData.length());
-  //   http_client.println();
-  //   http_client.print(postData);
-  // } else {
-  //   Serial.println("Failed to connect to server");
-  // }
+  if(postData != ""){
+    if (http_client.connect(api_serverName, api_port)) { // Replace with your server URL and port
+      http_client.println(String("POST ") + api_url + " HTTP/1.1"); // Replace with your API endpoint
+      http_client.println(String("Host: ") + api_serverName); // Replace with your server URL
+      http_client.println("Content-Type: application/x-www-form-urlencoded");
+      http_client.print("Content-Length: ");
+      http_client.println(postData.length());
+      // 添加Authorization头部
+      http_client.print("Authorization: Basic ");
+      String base64_auth = base64::encode(api_auth);
+      http_client.println(base64_auth);
+      http_client.println();
+      http_client.print(postData);
+    } else {
+      // Serial.println("Failed to connect to server");
+      tcp_send_ln("Failed to connect to server");
+    }
 
-  // while (http_client.connected()) {
-  //   if (http_client.available()) {
-  //     String line = http_client.readStringUntil('\n');
-  //     // Serial.println(line);
-  //   }
-  // }
+    while (http_client.connected()) {
+      if (http_client.available()) {
+        String line = http_client.readStringUntil('\n');
+        tcp_send_ln(line);
+      }
+    }
+
+    if (http_client_2.connect(api2_serverName, api2_port)) { // Replace with your server URL and port
+      http_client_2.println(String("POST ") + api2_url + " HTTP/1.1"); // Replace with your API endpoint
+      http_client_2.println(String("Host: ") + api2_serverName); // Replace with your server URL
+      http_client_2.println("Content-Type: application/x-www-form-urlencoded");
+      http_client_2.print("Content-Length: ");
+      http_client_2.println(postData.length());
+      http_client_2.println();
+      http_client_2.print(postData);
+    } else {
+      // Serial.println("Failed to connect to server");
+      tcp_send_ln("Failed to connect to server");
+    }
+
+    while (http_client_2.connected()) {
+      if (http_client_2.available()) {
+        String line = http_client_2.readStringUntil('\n');
+        tcp_send_ln(line);
+      }
+    }
+  }
+  
+  tcp_send_ln("");
+  tcp_send_ln("=====END=====");
+  tcp_send_ln("");
 }
 
 
