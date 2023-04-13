@@ -267,10 +267,10 @@ String HTU21D_read(int timestamp){
     Serial.println("temp:\t" + String(temp));
     Serial.println("hum:\t" + String(rel_hum));
     Serial.println("dp:\t" + String(dew_point));
-    result = "Weather,tag=Temperature Temperature=" + String(temp) + " " + timestamp + "\n" +
-                    "Weather,tag=Humidity Humidity=" + String(rel_hum) + " " + timestamp + "\n" +
-                    "Weather,tag=dewpoint dewpoint=" + String(dew_point) + " " + timestamp + "\n"
-                    ;
+    result =  "Weather,tag=Temperature Temperature=" + String(temp) + " " + timestamp + "\n" +
+              "Weather,tag=Humidity Humidity=" + String(rel_hum) + " " + timestamp + "\n" +
+              "Weather,tag=dewpoint dewpoint=" + String(dew_point) + " " + timestamp + "\n"
+              ;
   }else{
     Serial.println("HTU21D error");
   }
@@ -282,7 +282,8 @@ String BMP180_read(int timestamp){
   Serial.println("BMP180_read..");
   String result = "";
   if(myBMP.begin()){
-    Serial.println("Temp:\t"+ String(myBMP.getTemperature(), 1) + " +-1.0C");
+    String BMP_temp = String(myBMP.getTemperature(), 1);
+    Serial.println("Temp:\t"+ BMP_temp + " +-1.0C");
     Serial.println("Pa:\t"  + String(myBMP.getPressure())       + " +-100Pa");
 
     String Pressure_hPa = String(myBMP.getPressure_hPa());
@@ -305,8 +306,9 @@ String BMP180_read(int timestamp){
       case 5: Serial.println(F("sunny")); break;
     }
 
-    result = "Weather,tag=Pressure Pressure=" + Pressure_hPa + " " + timestamp + "\n" +
-             "Weather,tag=Forecast Forecast=" + Forecast + " " + timestamp + "\n"
+    result =  "Weather,tag=Temperature Temperature_2=" + BMP_temp + " " + timestamp + "\n" +
+              "Weather,tag=Pressure Pressure=" + Pressure_hPa + " " + timestamp + "\n" +
+              "Weather,tag=Forecast Forecast=" + Forecast + " " + timestamp + "\n"
              ;
   }else{
     Serial.println("BMP180 error");
@@ -514,11 +516,11 @@ void loop() {
   i2c_Scanning();
 
   Serial.print("Delay & Check Updates");
-  for (int i = 0; i < loop_delay_Time; i++) {
+  for (int i = 0; i < loop_delay_Time/2; i++) {
     Serial.print(".");
     // hasClient ();
     ArduinoOTA.handle();
-    delay(1000);
+    delay(2000);
   }
   // delay(10000);
 
@@ -569,6 +571,7 @@ void loop() {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
   
   if(postData != ""){
+    http_client.setTimeout(15000);
     if (http_client.connect(api_serverName, api_port)) { // Replace with your server URL and port
       http_client.println(String("POST ") + api_url + " HTTP/1.1"); // Replace with your API endpoint
       http_client.println(String("Host: ") + api_serverName); // Replace with your server URL
@@ -595,6 +598,7 @@ void loop() {
     //   }
     // }
 
+    http_client_2.setTimeout(15000);
     if (http_client_2.connect(api2_serverName, api2_port)) { // Replace with your server URL and port
       http_client_2.println(String("POST ") + api2_url + " HTTP/1.1"); // Replace with your API endpoint
       http_client_2.println(String("Host: ") + api2_serverName); // Replace with your server URL
