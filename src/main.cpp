@@ -32,6 +32,16 @@
 
 #include "config.h"
 
+#include <ESP8266WebServer.h>
+ESP8266WebServer webserver(80);
+void startWebServer();
+String urlDecode(String input);
+String makePage(String title, String contents);
+
+boolean first_start = true;
+String postData = "";
+String last_post_time = "null";
+
 int ledPin = 16;
 BH1750 lightMeter(0x23); //光照
 Adafruit_HTU21DF htu = Adafruit_HTU21DF();
@@ -42,52 +52,8 @@ BMP180advanced myBMP(BMP180_ULTRAHIGHRES);
 //时间全局变量
 struct tm timeinfo;
 
-// 创建TCP服务器对象
-// const int serverPort = 8888;
-// WiFiServer server(serverPort);
-
-// WiFiClient tcp_client;
 WiFiClient http_client;
 WiFiClient http_client_2;
-
-// void hasClient (){
-//   // 检查是否有客户端连接
-//   if (server.hasClient()) {
-//     if (!tcp_client.connected()) {
-//       tcp_client = server.available();
-//       if (tcp_client) {
-//         Serial.println("New client connected");
-//         tcp_client.write(String("connection succeeded\n").c_str());
-//       }
-//     }
-//   }
-// }
-// void tcp_send (String content){
-//   char message[100];
-//   snprintf(message, sizeof(message), "%s", content.c_str());
-//   // 发送数据给客户端
-//   if (tcp_client && tcp_client.connected()) {
-//     tcp_client.write(message);
-//   }
-//   Serial.write(message);
-// }
-// void tcp_send_ln (String content){
-//   char message[100];
-//   snprintf(message, sizeof(message), "%s\n", content.c_str());
-//   // 发送数据给客户端
-//   if (tcp_client && tcp_client.connected()) {
-//     tcp_client.write(message);
-//   }
-//   Serial.write(message);
-// }
-// void tcp_send_only (String content){
-//   char message[100];
-//   snprintf(message, sizeof(message), "%s", content.c_str());
-//   // 发送数据给客户端
-//   if (tcp_client && tcp_client.connected()) {
-//     tcp_client.write(message);
-//   }
-// }
 
 void INA226_check(int address){
   Serial.println("INA226_check address:" + String(address));
@@ -352,6 +318,41 @@ void i2c_Scanning() {
   }
 }
 
+String i2c_Scanning_re() {
+  byte error, address;
+  int deviceCount = 0;
+  String re = "";
+
+  for (address = 1; address < 127; address++) {
+    char hexValue[3];
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+
+    if (error == 0) {
+      re = re + "Device found at address 0x";
+      if (address < 16) {
+        re = re + "0";
+      }
+      sprintf(hexValue, "%02X", address);
+      re = re + hexValue + "\n";
+      deviceCount++;
+    } else if (error == 4) {
+      re = re + "Unknown error at address 0x";
+      if (address < 16) {
+        re = re + "0";
+      }
+      sprintf(hexValue, "%02X", address);
+      re = re + hexValue + "\n";
+    }
+  }
+  if (deviceCount == 0) {
+    re = re + "No I2C devices found\n\n";
+  } else {
+    re = re + "Scan complete\n\n";
+  }
+  return re;
+}
+
 void setup() {
   // put your setup code here, to run once:
   pinMode(ledPin, OUTPUT);
@@ -468,23 +469,26 @@ void setup() {
   Serial.println("Current time: " + String (asctime(&timeinfo)));
 
   Wire.begin();
-////////////////////////////////// INA226 ////
+  ////////////////////////////////// INA226 ////
   INA226_config();
   for (int i = 0; i < 2; i++) {
     INA226_check(ina226_address[i]);
   }
-////////////////////////////////// HTU21D ////
+  ////////////////////////////////// HTU21D ////
   if (!htu.begin()) {
     Serial.print("HTU21D error");
     delay(500);
   }
-////////////////////////////////// BH1750 ////
+  ////////////////////////////////// BH1750 ////
   if (!lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
     Serial.print("BH1750 error");
     delay(500);
   }
 
   // i2c_Scanning();
+
+  ////////// WEB服务器启动 ////
+  startWebServer();
 
   digitalWrite(ledPin, HIGH);
   delay(500);
@@ -513,16 +517,22 @@ void loop() {
 
   Serial.println("================ Version: " + String(VER) + " ================");
 
-  i2c_Scanning();
+  // i2c_Scanning();
+  Serial.println(i2c_Scanning_re());
 
-  Serial.print("Delay & Check Updates");
-  for (int i = 0; i < loop_delay_Time/2; i++) {
-    Serial.print(".");
-    // hasClient ();
-    ArduinoOTA.handle();
-    delay(2000);
+  if (first_start){
+    Serial.println("first_start");
+    first_start = false;
+  }else{
+    Serial.print("Delay & Check Updates");
+    for (int i = 0; i < loop_delay_Time/2; i++) {
+      Serial.print(".");
+      webserver.handleClient();  // 处理Web客户端请求
+      ArduinoOTA.handle();
+      delay(2000);
+    }
+    // delay(10000);
   }
-  // delay(10000);
 
   Serial.println("execute");
   
@@ -555,9 +565,11 @@ void loop() {
   String printStr = "Time: " + String(now) + " " + timeStr;
   Serial.println(printStr);
   Serial.println("");
+
+  last_post_time = timeStr;
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  String postData = "";
+  postData = "";
   
   String HTU21D_Data = HTU21D_read(now);
   String BMP180_Data = BMP180_read(now);
@@ -586,17 +598,7 @@ void loop() {
       http_client.print(postData);
     } else {
       Serial.println("Failed to connect to server");
-      // Serial.println("Failed to connect to server");
     }
-
-    //与TCP冲突
-
-    // while (http_client.connected()) {
-    //   if (http_client.available()) {
-    //     String line = http_client.readStringUntil('\n');
-    //     Serial.println(line);
-    //   }
-    // }
 
     http_client_2.setTimeout(15000);
     if (http_client_2.connect(api2_serverName, api2_port)) { // Replace with your server URL and port
@@ -609,15 +611,7 @@ void loop() {
       http_client_2.print(postData);
     } else {
       Serial.println("Failed to connect to server");
-      // Serial.println("Failed to connect to server");
     }
-
-    // while (http_client_2.connected()) {
-    //   if (http_client_2.available()) {
-    //     String line = http_client_2.readStringUntil('\n');
-    //     Serial.println(line);
-    //   }
-    // }
   }
   
   Serial.println("");
@@ -625,4 +619,79 @@ void loop() {
   Serial.println("");
 }
 
+ // 启动Web服务器
+void startWebServer() {
+  Serial.print("startWebServer...");
+  webserver.on("/", [](){
+      time_t now = time(nullptr);
+      localtime_r(&now, &timeinfo);
+      String time = String (asctime(&timeinfo));
+      String s = "<h1>WxS-info --- Version: " + String(VER) + "</h1>";
+      s = s + "<p>now_get_time: " + time + "</p>";
+      s = s + "<p>last_post_time: " + last_post_time + "</p>";
+      s = s + "<h2>postData</h2>";
+      s = s + "<p style=\"white-space: pre-line;\">" + postData + "</p>";
+      s = s + "<h2>i2c_Scanning</h2>";
+      s = s + "<p style=\"white-space: pre-line;\">" + i2c_Scanning_re() + "</p>";
+      webserver.send(200, "text/html", makePage("WxS-info", s));
+  });
+  webserver.on("/gpio", [](){
+    String s = "<form action=\"#\" method=\"get\"><label for=\"options\">GPIO-set：</label>"
+      "<select id=\"options\" name=\"option\">"
+        "<option value=\"auto\">自动</option>"
+        "<option value=\"on\">开</option>"
+        "<option value=\"off\">关</option>"
+      "</select><br><input type=\"submit\" value=\"提交\"></form>"
+    ;
+    webserver.send(200, "text/html", makePage("GPIO-set", s));
+  });
+  webserver.begin(); 
+  Serial.println("OK");
+}
 
+String makePage(String title, String contents) {
+  String s = "<!DOCTYPE html><html><head>";
+  s += "<meta name=\"viewport\" content=\"width=device-width,user-scalable=0\">";
+  s += "<meta charset=\"UTF-8\">";
+  s += "<title>";
+  s += title;
+  s += "</title></head><body>";
+  s += contents;
+  s += "</body></html>";
+  return s;
+}
+
+String urlDecode(String input) {
+  String s = input;
+  s.replace("%20", " ");
+  s.replace("+", " ");
+  s.replace("%21", "!");
+  s.replace("%22", "\"");
+  s.replace("%23", "#");
+  s.replace("%24", "$");
+  s.replace("%25", "%");
+  s.replace("%26", "&");
+  s.replace("%27", "\'");
+  s.replace("%28", "(");
+  s.replace("%29", ")");
+  s.replace("%30", "*");
+  s.replace("%31", "+");
+  s.replace("%2C", ",");
+  s.replace("%2E", ".");
+  s.replace("%2F", "/");
+  s.replace("%2C", ",");
+  s.replace("%3A", ":");
+  s.replace("%3A", ";");
+  s.replace("%3C", "<");
+  s.replace("%3D", "=");
+  s.replace("%3E", ">");
+  s.replace("%3F", "?");
+  s.replace("%40", "@");
+  s.replace("%5B", "[");
+  s.replace("%5C", "\\");
+  s.replace("%5D", "]");
+  s.replace("%5E", "^");
+  s.replace("%5F", "-");
+  s.replace("%60", "`");
+  return s;
+}
