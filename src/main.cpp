@@ -13,6 +13,7 @@
 
 #include <Arduino.h>
 #include <ArduinoOTA.h>
+#include <EEPROM.h>
 #include <base64.h>
 
 #include <Wire.h>
@@ -46,6 +47,13 @@ int ledPin = 16;
 BH1750 lightMeter(0x23); //光照
 Adafruit_HTU21DF htu = Adafruit_HTU21DF();
 int ina226_address[] = {0x41, 0x44}; //{65, 68} 65太阳能板 68电池
+int Battery_Voltage = 0;
+
+// 继电器参数
+const int JD1 = D5;
+const int JD2 = D6;
+const int address = 0; //EEPROM地址
+
 INA226 ina(Wire);
 BMP180advanced myBMP(BMP180_ULTRAHIGHRES);
 
@@ -174,6 +182,7 @@ String INA226_read(int timestamp,int address){
     }else if (address == 0x44)
     {
       type = "Battery";
+      Battery_Voltage = Busvoltage.toInt();
     }else{
       type = "error";
     }
@@ -353,10 +362,36 @@ String i2c_Scanning_re() {
   return re;
 }
 
+//继电器状态刷新
+void JD_Refresh(int JDX) {
+  int i = 0;
+  switch (JDX)
+  {
+  case JD1:i = 0;break;
+  case JD2:i = 1;break;
+  default:break;
+  }
+
+  switch (EEPROM.read(address + i))
+  {
+  case 0:if (digitalRead(JDX) != HIGH){digitalWrite(JDX, HIGH);}break;
+  case 1:if (digitalRead(JDX) != LOW){digitalWrite(JDX, LOW);}break;
+  case 2:
+    if (Battery_Voltage <= 11.1){
+      if (digitalRead(JDX) != HIGH){digitalWrite(JDX, HIGH);};
+    }else if (Battery_Voltage >= 12)
+    {
+      if (digitalRead(JDX) != LOW){digitalWrite(JDX, LOW);};
+    }
+    break;
+
+  default:break;
+  }
+}
+
 void setup() {
   // put your setup code here, to run once:
   pinMode(ledPin, OUTPUT);
-  // Wire.begin(D1, D2);
 
   Serial.begin(115200);
   Serial.println("");
@@ -436,11 +471,6 @@ void setup() {
   Serial.println("Connected to WiFi");
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
-  ///////////////////////////////////////// TCP SERVER ////
-  // server.begin();
-  // Serial.print("Server started on port ");
-  // Serial.println(serverPort);
-
 
   for (int i = 0; i < 20; i++) {
     Serial.print("Check Updates|");
@@ -489,6 +519,31 @@ void setup() {
 
   ////////// WEB服务器启动 ////
   startWebServer();
+
+  
+  // 继电器初始化
+  pinMode(JD1, OUTPUT);
+  pinMode(JD2, OUTPUT);
+  digitalWrite(JD1, HIGH);
+  digitalWrite(JD2, HIGH);
+
+  EEPROM.begin(512);
+
+  int value;
+  for (int i = 0; i < 2; i++) {
+    value = EEPROM.read(address + i);
+    if (value == 255 || value > 2) {
+      EEPROM.write(address + i, 2);
+    }
+  }
+  EEPROM.commit();
+
+  if (EEPROM.read(address + 0) == 1){
+    digitalWrite(JD1, LOW);
+  }
+  if (EEPROM.read(address + 1) == 1){
+    digitalWrite(JD2, LOW);
+  }
 
   digitalWrite(ledPin, HIGH);
   delay(500);
@@ -615,35 +670,119 @@ void loop() {
   }
   
   Serial.println("");
-  Serial.println("=====END=====");
+  Serial.println("=====POST=END=====");
   Serial.println("");
+
+  //继电器状态刷新
+  JD_Refresh(JD1);
+  JD_Refresh(JD2);
+
 }
 
  // 启动Web服务器
 void startWebServer() {
   Serial.print("startWebServer...");
   webserver.on("/", [](){
-      time_t now = time(nullptr);
-      localtime_r(&now, &timeinfo);
-      String time = String (asctime(&timeinfo));
-      String s = "<h1>WxS-info --- Version: " + String(VER) + "</h1>";
-      s = s + "<p>now_get_time: " + time + "</p>";
-      s = s + "<p>last_post_time: " + last_post_time + "</p>";
-      s = s + "<h2>postData</h2>";
-      s = s + "<p style=\"white-space: pre-line;\">" + postData + "</p>";
-      s = s + "<h2>i2c_Scanning</h2>";
-      s = s + "<p style=\"white-space: pre-line;\">" + i2c_Scanning_re() + "</p>";
-      webserver.send(200, "text/html", makePage("WxS-info", s));
+    time_t now = time(nullptr);
+    localtime_r(&now, &timeinfo);
+    String time = String (asctime(&timeinfo));
+
+    String JDstatus = 
+    "opi_opt = %d\n"
+    "cam_opt = %d"
+  ;
+  char buffer[50];
+  sprintf(buffer, JDstatus.c_str(), EEPROM.read(address + 0), EEPROM.read(address + 1));
+  JDstatus = String(buffer);
+
+  String s = "<h1>WxS-info --- Version: " + String(VER) + "</h1>";
+    s += "<p>now_get_time: " + time + "</p>";
+    s += "<p>last_post_time: " + last_post_time + "</p>";
+    s += "<h2>JDstatus</h2>";
+    s += "<p style=\"white-space: pre-line;\">" + JDstatus + "</p>";
+    s += "<h2>PostData</h2>";
+    s += "<p style=\"white-space: pre-line;\">" + postData + "</p>";
+    s += "<h2>I2C_Scanning</h2>";
+    s += "<p style=\"white-space: pre-line;\">" + i2c_Scanning_re() + "</p>"
+  ;
+  webserver.send(200, "text/html", makePage("WxS-info", s));
   });
   webserver.on("/gpio", [](){
-    String s = "<form action=\"#\" method=\"get\"><label for=\"options\">GPIO-set：</label>"
-      "<select id=\"options\" name=\"option\">"
-        "<option value=\"auto\">自动</option>"
-        "<option value=\"on\">开</option>"
-        "<option value=\"off\">关</option>"
-      "</select><br><input type=\"submit\" value=\"提交\"></form>"
+    String s = "<h1>GPIO-set</h1>"
+    "<form action=\"gupset\" method=\"get\">"
+      "<label for=\"opi_opt\">OrangePI：</label>"
+        "<select id=\"opi_opt\" name=\"opi_opt\">"
+          "<option value=\"off\">关</option>"
+          "<option value=\"on\">开</option>"
+          "<option value=\"auto\">自动</option>"
+        "</select><br>"
+      "<label for=\"cam_opt\">Camera：</label>"
+        "<select id=\"cam_opt\" name=\"cam_opt\">"
+          "<option value=\"off\">关</option>"
+          "<option value=\"on\">开</option>"
+          "<option value=\"auto\">自动</option>"
+        "</select><br><br>"
+      "<input type=\"submit\" value=\"提交\">"
+    "</form>"
     ;
-    webserver.send(200, "text/html", makePage("GPIO-set", s));
+    String js = 
+    "<script>"
+      "const my_opi_opt = document.getElementById(\"opi_opt\");"
+      "my_opi_opt.options[%d].selected = true;"
+      "const my_cam_opt = document.getElementById(\"cam_opt\");"
+      "my_cam_opt.options[%d].selected = true;"
+    "</script>"
+    ;
+
+    char buffer[300];
+    sprintf(buffer, js.c_str(), EEPROM.read(address + 0), EEPROM.read(address + 1));
+    js = String(buffer);
+
+    webserver.send(200, "text/html", makePage("GPIO-set", s+js));
+  });
+  webserver.on("/gupset", [](){
+    String opi_opt = urlDecode(webserver.arg("opi_opt"));
+    String cam_opt = urlDecode(webserver.arg("cam_opt"));
+    String s = "<h1>set</h1>"
+    ;
+    int i = 0;
+    if (opi_opt != ""){
+      if (opi_opt == "off") {
+        EEPROM.write(address + i, 0);
+      } else if (opi_opt == "on") {
+        EEPROM.write(address + i, 1);
+      } else if (opi_opt == "auto") {
+        EEPROM.write(address + i, 2);
+      } else {
+        EEPROM.write(address + i, 2);
+      }
+      EEPROM.commit();
+      JD_Refresh(JD1);
+      s += "<p>opi_opt: " + opi_opt + "</p>";
+      }
+
+    i = 1;
+    if (cam_opt != ""){
+      if (cam_opt == "off") {
+        EEPROM.write(address + i, 0);
+      } else if (cam_opt == "on") {
+        EEPROM.write(address + i, 1);
+      } else if (cam_opt == "auto") {
+        EEPROM.write(address + i, 2);
+      } else {
+        EEPROM.write(address + i, 2);
+      }
+      EEPROM.commit();
+      JD_Refresh(JD2);
+      s += "<p>cam_opt: " + cam_opt + "</p>";
+    }
+    String js = 
+    "<script type=\"text/javascript\">"
+      "setTimeout(function(){window.location.href = \"/gpio\";}, 2000);"
+    "</script>"
+    ;
+
+    webserver.send(200, "text/html", makePage("set", s+js));
   });
   webserver.begin(); 
   Serial.println("OK");
@@ -655,7 +794,7 @@ String makePage(String title, String contents) {
   s += "<meta charset=\"UTF-8\">";
   s += "<title>";
   s += title;
-  s += "</title></head><body>";
+  s += "</title></head><body style=\"text-align: center;\">";
   s += contents;
   s += "</body></html>";
   return s;
