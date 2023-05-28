@@ -13,7 +13,18 @@
 			"system_error": "cpp",
 			"string": "cpp",
 			"random": "cpp",
-			"*.tcc": "cpp"
+			"*.tcc": "cpp",
+			"array": "cpp",
+			"chrono": "cpp",
+			"compare": "cpp",
+			"functional": "cpp",
+			"ostream": "cpp",
+			"ranges": "cpp",
+			"ratio": "cpp",
+			"tuple": "cpp",
+			"type_traits": "cpp",
+			"utility": "cpp",
+			"variant": "cpp"
 		}
 	}
 }

@@ -47,7 +47,7 @@ int ledPin = 16;
 BH1750 lightMeter(0x23); //光照
 Adafruit_HTU21DF htu = Adafruit_HTU21DF();
 int ina226_address[] = {0x41, 0x44}; //{65, 68} 65太阳能板 68电池
-int Battery_Voltage = 0;
+float Battery_Voltage = 0.000;
 
 // 继电器参数
 const int JD1 = D5;
@@ -182,7 +182,7 @@ String INA226_read(int timestamp,int address){
     }else if (address == 0x44)
     {
       type = "Battery";
-      Battery_Voltage = Busvoltage.toInt();
+      Battery_Voltage = Busvoltage.toFloat();
     }else{
       type = "error";
     }
@@ -377,9 +377,9 @@ void JD_Refresh(int JDX) {
   case 0:if (digitalRead(JDX) != HIGH){digitalWrite(JDX, HIGH);}break;
   case 1:if (digitalRead(JDX) != LOW){digitalWrite(JDX, LOW);}break;
   case 2:
-    if (Battery_Voltage <= 11.1){
+    if (Battery_Voltage <= EEPROM.read(address + 2)){
       if (digitalRead(JDX) != HIGH){digitalWrite(JDX, HIGH);};
-    }else if (Battery_Voltage >= 12)
+    }else if (Battery_Voltage >= EEPROM.read(address + 3))
     {
       if (digitalRead(JDX) != LOW){digitalWrite(JDX, LOW);};
     }
@@ -387,6 +387,22 @@ void JD_Refresh(int JDX) {
 
   default:break;
   }
+}
+
+bool isNumeric(String str) {
+  // 检查字符串是否为空
+  if (str.length() == 0) {
+    return false;
+  }
+
+  // 检查字符串中的每个字符是否都是数字
+  for (unsigned int i = 0; i < str.length(); i++) {
+    if (!isdigit(str.charAt(i))) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 void setup() {
@@ -536,6 +552,16 @@ void setup() {
       EEPROM.write(address + i, 2);
     }
   }
+
+  value = EEPROM.read(address + 2); //关电压
+  if (value == 255 || value > 100) {
+    EEPROM.write(address + 2, 11.1);
+  }
+  value = EEPROM.read(address + 3); //开电压
+  if (value == 255 || value > 100) {
+    EEPROM.write(address + 3, 12);
+  }
+
   EEPROM.commit();
 
   if (EEPROM.read(address + 0) == 1){
@@ -689,7 +715,7 @@ void startWebServer() {
 
     String JDstatus = 
     "opi_opt = %d\n"
-    "cam_opt = %d"
+    "cam_opt = %d\n"
   ;
   char buffer[50];
   sprintf(buffer, JDstatus.c_str(), EEPROM.read(address + 0), EEPROM.read(address + 1));
@@ -700,6 +726,7 @@ void startWebServer() {
     s += "<p>last_post_time: " + last_post_time + "</p>";
     s += "<h2>JDstatus</h2>";
     s += "<p style=\"white-space: pre-line;\">" + JDstatus + "</p>";
+    s += "<br><p style=\"white-space: pre-line;\">Battery_Voltage: " + String(Battery_Voltage) + " V</p>";
     s += "<h2>PostData</h2>";
     s += "<p style=\"white-space: pre-line;\">" + postData + "</p>";
     s += "<h2>I2C_Scanning</h2>";
@@ -709,6 +736,7 @@ void startWebServer() {
   });
   webserver.on("/gpio", [](){
     String s = "<h1>GPIO-set</h1>"
+    "<h2>继电器模式</h2>"
     "<form action=\"gupset\" method=\"get\">"
       "<label for=\"opi_opt\">OrangePI：</label>"
         "<select id=\"opi_opt\" name=\"opi_opt\">"
@@ -724,6 +752,17 @@ void startWebServer() {
         "</select><br><br>"
       "<input type=\"submit\" value=\"提交\">"
     "</form>"
+
+    "<h2>启停电压设置</h2>"
+    "<form action=\"gupset\" method=\"get\">"
+      "<label for=\"off_v\">关闭：</label>"
+      "<input type=\"number\" id=\"off_v\" name=\"off_v\" step=\"0.001\" style=\"width: 1cm;\">"
+      "<label for=\"off_v\"> V</label><br>"
+      "<label for=\"on_v\">开启：</label>"
+      "<input type=\"number\" id=\"on_v\" name=\"on_v\" step=\"0.001\" style=\"width: 1cm;\">"
+      "<label for=\"on_v\"> V</label><br>"
+      "<br><button type=\"submit\">提交</button>"
+    "</form>"
     ;
     String js = 
     "<script>"
@@ -731,11 +770,18 @@ void startWebServer() {
       "my_opi_opt.options[%d].selected = true;"
       "const my_cam_opt = document.getElementById(\"cam_opt\");"
       "my_cam_opt.options[%d].selected = true;"
+      "document.getElementById(\"off_v\").value = %d;"
+      "document.getElementById(\"on_v\").value = %d;"
     "</script>"
     ;
 
     char buffer[300];
-    sprintf(buffer, js.c_str(), EEPROM.read(address + 0), EEPROM.read(address + 1));
+    sprintf(buffer, js.c_str(), 
+      EEPROM.read(address + 0), //JD1
+      EEPROM.read(address + 1), //JD2
+      EEPROM.read(address + 2), //OFF_v
+      EEPROM.read(address + 3)) //ON_v
+    ;
     js = String(buffer);
 
     webserver.send(200, "text/html", makePage("GPIO-set", s+js));
@@ -743,6 +789,9 @@ void startWebServer() {
   webserver.on("/gupset", [](){
     String opi_opt = urlDecode(webserver.arg("opi_opt"));
     String cam_opt = urlDecode(webserver.arg("cam_opt"));
+    String off_v_str = webserver.arg("off_v");
+    String on_v_str = webserver.arg("on_v");
+    
     String s = "<h1>set</h1>"
     ;
     int i = 0;
@@ -776,6 +825,26 @@ void startWebServer() {
       JD_Refresh(JD2);
       s += "<p>cam_opt: " + cam_opt + "</p>";
     }
+
+    int off_v,on_v;
+    if(off_v_str != ""){
+      if(isNumeric(off_v_str)){
+        off_v = off_v_str.toInt();
+        EEPROM.write(address + 2, off_v);
+        EEPROM.commit();
+        s += "<p>off_v: " + off_v_str + "</p>";
+      }
+    }
+    
+    if(on_v_str != ""){
+      if(isNumeric(on_v_str)){
+        on_v = on_v_str.toInt();
+        EEPROM.write(address + 3, on_v);
+        EEPROM.commit();
+        s += "<p>on_v: " + on_v_str + "</p>";
+      }
+    }
+
     String js = 
     "<script type=\"text/javascript\">"
       "setTimeout(function(){window.location.href = \"/gpio\";}, 2000);"
