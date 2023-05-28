@@ -47,7 +47,7 @@ int ledPin = 16;
 BH1750 lightMeter(0x23); //光照
 Adafruit_HTU21DF htu = Adafruit_HTU21DF();
 int ina226_address[] = {0x41, 0x44}; //{65, 68} 65太阳能板 68电池
-int Battery_Voltage = 0;
+float Battery_Voltage = 0;
 
 // 继电器参数
 const int JD1 = D5;
@@ -153,7 +153,8 @@ String INA226_read(int timestamp,int address){
     Serial.println("INA226 error");
     delay(500);
   }else{
-    String Busvoltage = String (ina.readBusVoltage(), 5);
+    float Busvoltage_f = ina.readBusVoltage();
+    String Busvoltage = String (Busvoltage_f);
     String BusPower = String (ina.readBusPower(), 5);
     String ShuntVoltage = String (ina.readShuntVoltage(), 5);
     String ShuntCurrent = String (ina.readShuntCurrent(), 5);
@@ -182,7 +183,7 @@ String INA226_read(int timestamp,int address){
     }else if (address == 0x44)
     {
       type = "Battery";
-      Battery_Voltage = Busvoltage.toInt();
+      Battery_Voltage = Busvoltage_f;
     }else{
       type = "error";
     }
