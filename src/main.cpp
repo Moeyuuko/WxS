@@ -378,9 +378,12 @@ void JD_Refresh(int JDX) {
   case 0:if (digitalRead(JDX) != HIGH){digitalWrite(JDX, HIGH);}break;
   case 1:if (digitalRead(JDX) != LOW){digitalWrite(JDX, LOW);}break;
   case 2:
-    if (Battery_Voltage <= EEPROM.read(address + 2)){
+    float OFF_v_f,ON_v_f;
+    EEPROM.get(address + 20,OFF_v_f);
+    EEPROM.get(address + 30,ON_v_f);
+    if (Battery_Voltage <= OFF_v_f){ //off
       if (digitalRead(JDX) != HIGH){digitalWrite(JDX, HIGH);};
-    }else if (Battery_Voltage >= EEPROM.read(address + 3))
+    }else if (Battery_Voltage >= ON_v_f) //on
     {
       if (digitalRead(JDX) != LOW){digitalWrite(JDX, LOW);};
     }
@@ -391,19 +394,19 @@ void JD_Refresh(int JDX) {
 }
 
 bool isNumeric(String str) {
-  // 检查字符串是否为空
-  if (str.length() == 0) {
-    return false;
-  }
-
-  // 检查字符串中的每个字符是否都是数字
+  bool hasDecimal = false;
   for (unsigned int i = 0; i < str.length(); i++) {
-    if (!isdigit(str.charAt(i))) {
-      return false;
+    if (str.charAt(i) == '.') {
+      if (hasDecimal) {
+        return false; // 如果已经有一个小数点，则返回false
+      } else {
+        hasDecimal = true;
+      }
+    } else if (!isdigit(str.charAt(i))) {
+      return false; // 如果不是数字字符，则返回false
     }
   }
-
-  return true;
+  return true; // 如果所有字符都是数字字符或者包含一个小数点和数字字符，则返回true
 }
 
 void setup() {
@@ -554,13 +557,14 @@ void setup() {
     }
   }
 
-  value = EEPROM.read(address + 2); //关电压
-  if (value == 255 || value > 100) {
-    EEPROM.write(address + 2, 11.1);
+  float value_f;
+  EEPROM.get(address + 20, value_f); //关电压
+  if (value_f == 255 || value_f > 50) {
+    EEPROM.put(address + 20, 11.1);
   }
-  value = EEPROM.read(address + 3); //开电压
-  if (value == 255 || value > 100) {
-    EEPROM.write(address + 3, 12);
+  EEPROM.get(address + 30, value_f); //开电压
+  if (value_f == 255 || value_f > 50) {
+    EEPROM.put(address + 30, 12);
   }
 
   EEPROM.commit();
@@ -722,17 +726,25 @@ void startWebServer() {
   sprintf(buffer, JDstatus.c_str(), EEPROM.read(address + 0), EEPROM.read(address + 1));
   JDstatus = String(buffer);
 
-  String s = "<h1>WxS-info --- Version: " + String(VER) + "</h1>";
-    s += "<p>now_get_time: " + time + "</p>";
-    s += "<p>last_post_time: " + last_post_time + "</p>";
-    s += "<h2>JDstatus</h2>";
-    s += "<p style=\"white-space: pre-line;\">" + JDstatus + "</p>";
-    s += "<br><p style=\"white-space: pre-line;\">Battery_Voltage: " + String(Battery_Voltage) + " V</p>";
-    s += "<h2>PostData</h2>";
-    s += "<p style=\"white-space: pre-line;\">" + postData + "</p>";
-    s += "<h2>I2C_Scanning</h2>";
-    s += "<p style=\"white-space: pre-line;\">" + i2c_Scanning_re() + "</p>"
-  ;
+  String s;
+  s += "<h1>WxS-info --- Version: " + String(VER) + "</h1>";
+  s += "<p>now_get_time: " + time + "</p>";
+  s += "<p>last_post_time: " + last_post_time + "</p>";
+  s += "<h2>JDstatus</h2>";
+  s += "<p style=\"white-space: pre-line;\">" + JDstatus + "</p>";
+  s += "<p style=\"white-space: pre-line;\">Battery_Voltage: " + String(Battery_Voltage) + " V</p>";
+  float OFF_v_f,ON_v_f;
+  EEPROM.get(address + 20, OFF_v_f); //OFF_v
+  EEPROM.get(address + 30, ON_v_f); //ON_v
+  s += "<p style=\"white-space: pre-line;\">OFF_V: " + String(OFF_v_f) + "\nON_V: " + String(ON_v_f) + "</p>";
+  String JD1_status,JD2_status;
+  if(digitalRead(JD1) == LOW){JD1_status = "ON";}else{JD1_status = "OFF";}
+  if(digitalRead(JD2) == LOW){JD2_status = "ON";}else{JD2_status = "OFF";}
+  s += "<p style=\"white-space: pre-line;\">JD1: " + JD1_status + "\nJD2: " + JD2_status + "</p>";
+  s += "<h2>PostData</h2>";
+  s += "<p style=\"white-space: pre-line;\">" + postData + "</p>";
+  s += "<h2>I2C_Scanning</h2>";
+  s += "<p style=\"white-space: pre-line;\">" + i2c_Scanning_re() + "</p>";
   webserver.send(200, "text/html", makePage("WxS-info", s));
   });
   webserver.on("/gpio", [](){
@@ -757,32 +769,35 @@ void startWebServer() {
     "<h2>启停电压设置</h2>"
     "<form action=\"gupset\" method=\"get\">"
       "<label for=\"off_v\">关闭：</label>"
-      "<input type=\"number\" id=\"off_v\" name=\"off_v\" step=\"0.001\" style=\"width: 1cm;\">"
+      "<input type=\"number\" id=\"off_v\" name=\"off_v\" step=\"0.001\" style=\"width: 1.5cm;\">"
       "<label for=\"off_v\"> V</label><br>"
       "<label for=\"on_v\">开启：</label>"
-      "<input type=\"number\" id=\"on_v\" name=\"on_v\" step=\"0.001\" style=\"width: 1cm;\">"
+      "<input type=\"number\" id=\"on_v\" name=\"on_v\" step=\"0.001\" style=\"width: 1.5cm;\">"
       "<label for=\"on_v\"> V</label><br>"
       "<br><button type=\"submit\">提交</button>"
     "</form>"
     ;
     String js = 
     "<script>"
-      "const my_opi_opt = document.getElementById(\"opi_opt\");"
+      "const my_opi_opt = document.getElementById(\"opi_opt\");\n"
       "my_opi_opt.options[%d].selected = true;"
-      "const my_cam_opt = document.getElementById(\"cam_opt\");"
-      "my_cam_opt.options[%d].selected = true;"
-      "document.getElementById(\"off_v\").value = %d;"
-      "document.getElementById(\"on_v\").value = %d;"
+      "const my_cam_opt = document.getElementById(\"cam_opt\");\n"
+      "my_cam_opt.options[%d].selected = true;\n"
+      "document.getElementById(\"off_v\").value = %.3f;\n"
+      "document.getElementById(\"on_v\").value = %.3f;\n"
     "</script>"
     ;
 
-    char buffer[300];
+    char buffer[500];
+    float OFF_v_f,ON_v_f;
+    EEPROM.get(address + 20, OFF_v_f); //OFF_v
+    EEPROM.get(address + 30, ON_v_f); //ON_v
     sprintf(buffer, js.c_str(), 
       EEPROM.read(address + 0), //JD1
       EEPROM.read(address + 1), //JD2
-      EEPROM.read(address + 2), //OFF_v
-      EEPROM.read(address + 3)) //ON_v
-    ;
+      OFF_v_f,
+      ON_v_f
+    );
     js = String(buffer);
 
     webserver.send(200, "text/html", makePage("GPIO-set", s+js));
@@ -827,11 +842,11 @@ void startWebServer() {
       s += "<p>cam_opt: " + cam_opt + "</p>";
     }
 
-    int off_v,on_v;
+    float off_v,on_v;
     if(off_v_str != ""){
       if(isNumeric(off_v_str)){
-        off_v = off_v_str.toInt();
-        EEPROM.write(address + 2, off_v);
+        off_v = off_v_str.toFloat();
+        EEPROM.put(address + 20, off_v);
         EEPROM.commit();
         s += "<p>off_v: " + off_v_str + "</p>";
       }
@@ -839,8 +854,8 @@ void startWebServer() {
     
     if(on_v_str != ""){
       if(isNumeric(on_v_str)){
-        on_v = on_v_str.toInt();
-        EEPROM.write(address + 3, on_v);
+        on_v = on_v_str.toFloat();
+        EEPROM.put(address + 30, on_v);
         EEPROM.commit();
         s += "<p>on_v: " + on_v_str + "</p>";
       }
