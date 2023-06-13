@@ -48,6 +48,7 @@ BH1750 lightMeter(0x23); //光照
 Adafruit_HTU21DF htu = Adafruit_HTU21DF();
 int ina226_address[] = {0x41, 0x44}; //{65, 68} 65太阳能板 68电池
 float Battery_Voltage = 0;
+float BH1750_Lx = 0;
 
 // 继电器参数
 const int JD1 = D5;
@@ -221,6 +222,7 @@ String BH1750_read(int timestamp){
     float lux = lightMeter.readLightLevel();
     if(lux>=0){
       Serial.println("Light:\t" + String(lux) + " lx");
+      BH1750_Lx = lux;  //记录到全局变量
       result = "Weather,tag=Brightness Brightness=" + String(lux) + " " + timestamp + "\n";
     }else{
       Serial.println("BH1750 error Light: " + String(lux) + " lx");
@@ -372,18 +374,27 @@ void JD_Refresh(int JDX) {
   case JD2:i = 1;break;
   default:break;
   }
-
+  float OFF_v_f,ON_v_f;
   switch (EEPROM.read(address + i))
   {
   case 0:if (digitalRead(JDX) != HIGH){digitalWrite(JDX, HIGH);}break;
   case 1:if (digitalRead(JDX) != LOW){digitalWrite(JDX, LOW);}break;
   case 2:
-    float OFF_v_f,ON_v_f;
     EEPROM.get(address + 20,OFF_v_f);
     EEPROM.get(address + 30,ON_v_f);
     if (Battery_Voltage <= OFF_v_f){ //off
       if (digitalRead(JDX) != HIGH){digitalWrite(JDX, HIGH);};
     }else if (Battery_Voltage >= ON_v_f) //on
+    {
+      if (digitalRead(JDX) != LOW){digitalWrite(JDX, LOW);};
+    }
+    break;
+  case 3:
+    EEPROM.get(address + 20,OFF_v_f);
+    EEPROM.get(address + 30,ON_v_f);
+    if (BH1750_Lx <= OFF_v_f){ //off
+      if (digitalRead(JDX) != HIGH){digitalWrite(JDX, HIGH);};
+    }else if (BH1750_Lx >= ON_v_f) //on
     {
       if (digitalRead(JDX) != LOW){digitalWrite(JDX, LOW);};
     }
@@ -733,10 +744,11 @@ void startWebServer() {
   s += "<h2>JDstatus</h2>";
   s += "<p style=\"white-space: pre-line;\">" + JDstatus + "</p>";
   s += "<p style=\"white-space: pre-line;\">Battery_Voltage: " + String(Battery_Voltage) + " V</p>";
+  s += "<p style=\"white-space: pre-line;\">Sensor_brightness: " + String(BH1750_Lx) + " Lx</p>";
   float OFF_v_f,ON_v_f;
   EEPROM.get(address + 20, OFF_v_f); //OFF_v
   EEPROM.get(address + 30, ON_v_f); //ON_v
-  s += "<p style=\"white-space: pre-line;\">OFF_V: " + String(OFF_v_f) + "\nON_V: " + String(ON_v_f) + "</p>";
+  s += "<p style=\"white-space: pre-line;\">OFF_V/lx: " + String(OFF_v_f) + "\nON_V/lx: " + String(ON_v_f) + "</p>";
   String JD1_status,JD2_status;
   if(digitalRead(JD1) == LOW){JD1_status = "ON";}else{JD1_status = "OFF";}
   if(digitalRead(JD2) == LOW){JD2_status = "ON";}else{JD2_status = "OFF";}
@@ -755,13 +767,15 @@ void startWebServer() {
         "<select id=\"opi_opt\" name=\"opi_opt\">"
           "<option value=\"off\">关</option>"
           "<option value=\"on\">开</option>"
-          "<option value=\"auto\">自动</option>"
+          "<option value=\"auto-v\">自动电压</option>"
+          "<option value=\"auto-lx\">自动亮度</option>"
         "</select><br>"
       "<label for=\"cam_opt\">Camera：</label>"
         "<select id=\"cam_opt\" name=\"cam_opt\">"
           "<option value=\"off\">关</option>"
           "<option value=\"on\">开</option>"
-          "<option value=\"auto\">自动</option>"
+          "<option value=\"auto-v\">自动电压</option>"
+          "<option value=\"auto-lx\">自动亮度</option>"
         "</select><br><br>"
       "<input type=\"submit\" value=\"提交\">"
     "</form>"
@@ -769,11 +783,11 @@ void startWebServer() {
     "<h2>启停电压设置</h2>"
     "<form action=\"gupset\" method=\"get\">"
       "<label for=\"off_v\">关闭：</label>"
-      "<input type=\"number\" id=\"off_v\" name=\"off_v\" step=\"0.001\" style=\"width: 1.5cm;\">"
-      "<label for=\"off_v\"> V</label><br>"
+      "<input type=\"number\" id=\"off_v\" name=\"off_v\" step=\"0.01\" style=\"width: 1.5cm;\">"
+      "<label for=\"off_v\"> V/lx</label><br>"
       "<label for=\"on_v\">开启：</label>"
-      "<input type=\"number\" id=\"on_v\" name=\"on_v\" step=\"0.001\" style=\"width: 1.5cm;\">"
-      "<label for=\"on_v\"> V</label><br>"
+      "<input type=\"number\" id=\"on_v\" name=\"on_v\" step=\"0.01\" style=\"width: 1.5cm;\">"
+      "<label for=\"on_v\"> V/lx</label><br>"
       "<br><button type=\"submit\">提交</button>"
     "</form>"
     ;
@@ -816,10 +830,12 @@ void startWebServer() {
         EEPROM.write(address + i, 0);
       } else if (opi_opt == "on") {
         EEPROM.write(address + i, 1);
-      } else if (opi_opt == "auto") {
+      } else if (opi_opt == "auto-v") {
         EEPROM.write(address + i, 2);
+      } else if (opi_opt == "auto-lx") {
+        EEPROM.write(address + i, 3);
       } else {
-        EEPROM.write(address + i, 2);
+        EEPROM.write(address + i, 1);
       }
       EEPROM.commit();
       JD_Refresh(JD1);
@@ -832,10 +848,12 @@ void startWebServer() {
         EEPROM.write(address + i, 0);
       } else if (cam_opt == "on") {
         EEPROM.write(address + i, 1);
-      } else if (cam_opt == "auto") {
+      } else if (cam_opt == "auto-v") {
         EEPROM.write(address + i, 2);
+      } else if (cam_opt == "auto-lx") {
+        EEPROM.write(address + i, 3);
       } else {
-        EEPROM.write(address + i, 2);
+        EEPROM.write(address + i, 1);
       }
       EEPROM.commit();
       JD_Refresh(JD2);
@@ -848,7 +866,7 @@ void startWebServer() {
         off_v = off_v_str.toFloat();
         EEPROM.put(address + 20, off_v);
         EEPROM.commit();
-        s += "<p>off_v: " + off_v_str + "</p>";
+        s += "<p>关闭V/lx: " + off_v_str + "</p>";
       }
     }
     
@@ -857,7 +875,7 @@ void startWebServer() {
         on_v = on_v_str.toFloat();
         EEPROM.put(address + 30, on_v);
         EEPROM.commit();
-        s += "<p>on_v: " + on_v_str + "</p>";
+        s += "<p>开启V/lx: " + on_v_str + "</p>";
       }
     }
 
