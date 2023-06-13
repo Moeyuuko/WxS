@@ -574,13 +574,17 @@ void setup() {
   }
 
   float value_f;
-  EEPROM.get(address + 20, value_f); //关电压
-  if (value_f == 255 || value_f > 50) {
+  if (!EEPROM.get(address + 20, value_f)) { //初始关电压
     EEPROM.put(address + 20, 11.1);
   }
-  EEPROM.get(address + 30, value_f); //开电压
-  if (value_f == 255 || value_f > 50) {
+  if (!EEPROM.get(address + 30, value_f)) { //初始开电压
     EEPROM.put(address + 30, 12);
+  }
+  if (!EEPROM.get(address + 40, value_f)) { //初始关亮度
+    EEPROM.put(address + 40, 0);
+  }
+  if (!EEPROM.get(address + 50, value_f)) { //初始开亮度
+    EEPROM.put(address + 50, 1);
   }
 
   EEPROM.commit();
@@ -750,10 +754,13 @@ void startWebServer() {
   s += "<p style=\"white-space: pre-line;\">" + JDstatus + "</p>";
   s += "<p style=\"white-space: pre-line;\">Battery_Voltage: " + String(Battery_Voltage) + " V</p>";
   s += "<p style=\"white-space: pre-line;\">Sensor_brightness: " + String(BH1750_Lx) + " Lx</p>";
-  float OFF_v_f,ON_v_f;
+  float OFF_v_f,ON_v_f,OFF_lx_f,ON_lx_f;
   EEPROM.get(address + 20, OFF_v_f); //OFF_v
   EEPROM.get(address + 30, ON_v_f); //ON_v
-  s += "<p style=\"white-space: pre-line;\">OFF_V/lx: " + String(OFF_v_f) + "\nON_V/lx: " + String(ON_v_f) + "</p>";
+  EEPROM.get(address + 40, OFF_lx_f); //OFF_lx
+  EEPROM.get(address + 50, ON_lx_f); //ON_lx
+  s += "<p style=\"white-space: pre-line;\">OFF_V: " + String(OFF_v_f) + "\nON_V: " + String(ON_v_f) + "</p>";
+  s += "<p style=\"white-space: pre-line;\">OFF_lx: " + String(OFF_lx_f) + "\nON_lx: " + String(ON_lx_f) + "</p>";
   String JD1_status,JD2_status;
   if(digitalRead(JD1) == LOW){JD1_status = "ON";}else{JD1_status = "OFF";}
   if(digitalRead(JD2) == LOW){JD2_status = "ON";}else{JD2_status = "OFF";}
@@ -769,30 +776,41 @@ void startWebServer() {
     "<h2>继电器模式</h2>"
     "<form action=\"gupset\" method=\"get\">"
       "<label for=\"opi_opt\">OrangePI：</label>"
-        "<select id=\"opi_opt\" name=\"opi_opt\">"
-          "<option value=\"off\">关</option>"
-          "<option value=\"on\">开</option>"
+        "<select id=\"opi_opt\" name=\"opi_opt\" style=\"width: 2.8cm;\">"
+          "<option value=\"off\">===关===</option>"
+          "<option value=\"on\">===开===</option>"
           "<option value=\"auto-v\">自动电压</option>"
           "<option value=\"auto-lx\">自动亮度</option>"
         "</select><br>"
       "<label for=\"cam_opt\">Camera：</label>"
-        "<select id=\"cam_opt\" name=\"cam_opt\">"
-          "<option value=\"off\">关</option>"
-          "<option value=\"on\">开</option>"
+        "<select id=\"cam_opt\" name=\"cam_opt\" style=\"width: 2.8cm;\">"
+          "<option value=\"off\">===关===</option>"
+          "<option value=\"on\">===开===</option>"
           "<option value=\"auto-v\">自动电压</option>"
           "<option value=\"auto-lx\">自动亮度</option>"
         "</select><br><br>"
       "<input type=\"submit\" value=\"提交\">"
     "</form>"
 
-    "<h2>启停电压设置</h2>"
+    "<h2>启停设置</h2>"
+    "<h3>电压</h3>"
     "<form action=\"gupset\" method=\"get\">"
       "<label for=\"off_v\">关闭：</label>"
-      "<input type=\"number\" id=\"off_v\" name=\"off_v\" step=\"0.01\" style=\"width: 1.5cm;\">"
-      "<label for=\"off_v\"> V/lx</label><br>"
+      "<input type=\"number\" id=\"off_v\" name=\"off_v\" step=\"0.01\" style=\"width: 1.8cm;\">"
+      "<label for=\"off_v\"> V</label><br>"
       "<label for=\"on_v\">开启：</label>"
-      "<input type=\"number\" id=\"on_v\" name=\"on_v\" step=\"0.01\" style=\"width: 1.5cm;\">"
-      "<label for=\"on_v\"> V/lx</label><br>"
+      "<input type=\"number\" id=\"on_v\" name=\"on_v\" step=\"0.01\" style=\"width: 1.8cm;\">"
+      "<label for=\"on_v\"> V</label><br>"
+      "<br><button type=\"submit\">提交</button>"
+    "</form>"
+    "<h3>亮度</h3>"
+    "<form action=\"gupset\" method=\"get\">"
+      "<label for=\"off_lx\">关闭：</label>"
+      "<input type=\"number\" id=\"off_lx\" name=\"off_lx\" step=\"0.01\" style=\"width: 1.8cm;\">"
+      "<label for=\"off_lx\"> lx</label><br>"
+      "<label for=\"on_lx\">开启：</label>"
+      "<input type=\"number\" id=\"on_lx\" name=\"on_lx\" step=\"0.01\" style=\"width: 1.8cm;\">"
+      "<label for=\"on_lx\"> lx</label><br>"
       "<br><button type=\"submit\">提交</button>"
     "</form>"
     ;
@@ -804,18 +822,24 @@ void startWebServer() {
       "my_cam_opt.options[%d].selected = true;\n"
       "document.getElementById(\"off_v\").value = %.3f;\n"
       "document.getElementById(\"on_v\").value = %.3f;\n"
+      "document.getElementById(\"off_lx\").value = %.3f;\n"
+      "document.getElementById(\"on_lx\").value = %.3f;\n"
     "</script>"
     ;
 
     char buffer[500];
-    float OFF_v_f,ON_v_f;
+    float OFF_v_f,ON_v_f,OFF_lx_f,ON_lx_f;
     EEPROM.get(address + 20, OFF_v_f); //OFF_v
     EEPROM.get(address + 30, ON_v_f); //ON_v
+    EEPROM.get(address + 40, OFF_lx_f); //OFF_lx
+    EEPROM.get(address + 50, ON_lx_f); //ON_lx
     sprintf(buffer, js.c_str(), 
       EEPROM.read(address + 0), //JD1
       EEPROM.read(address + 1), //JD2
       OFF_v_f,
-      ON_v_f
+      ON_v_f,
+      OFF_lx_f,
+      ON_lx_f
     );
     js = String(buffer);
 
@@ -826,6 +850,8 @@ void startWebServer() {
     String cam_opt = urlDecode(webserver.arg("cam_opt"));
     String off_v_str = webserver.arg("off_v");
     String on_v_str = webserver.arg("on_v");
+    String off_lx_str = webserver.arg("off_lx");
+    String on_lx_str = webserver.arg("on_lx");
     
     String s = "<h1>set</h1>"
     ;
@@ -864,23 +890,38 @@ void startWebServer() {
       JD_Refresh(JD2);
       s += "<p>cam_opt: " + cam_opt + "</p>";
     }
-
-    float off_v,on_v;
+    
+///////////////电压
     if(off_v_str != ""){
       if(isNumeric(off_v_str)){
-        off_v = off_v_str.toFloat();
-        EEPROM.put(address + 20, off_v);
+        EEPROM.put(address + 20, off_v_str.toFloat());
         EEPROM.commit();
-        s += "<p>关闭V/lx: " + off_v_str + "</p>";
+        s += "<p>关闭V: " + off_v_str + "</p>";
       }
     }
     
     if(on_v_str != ""){
       if(isNumeric(on_v_str)){
-        on_v = on_v_str.toFloat();
-        EEPROM.put(address + 30, on_v);
+        EEPROM.put(address + 30, on_v_str.toFloat());
         EEPROM.commit();
-        s += "<p>开启V/lx: " + on_v_str + "</p>";
+        s += "<p>开启V: " + on_v_str + "</p>";
+      }
+    }
+
+///////////////亮度
+    if(off_lx_str != ""){
+      if(isNumeric(off_lx_str)){
+        EEPROM.put(address + 40, off_lx_str.toFloat());
+        EEPROM.commit();
+        s += "<p>关闭lx: " + off_lx_str + "</p>";
+      }
+    }
+    
+    if(on_lx_str != ""){
+      if(isNumeric(on_lx_str)){
+        EEPROM.put(address + 50, on_lx_str.toFloat());
+        EEPROM.commit();
+        s += "<p>开启lx: " + on_lx_str + "</p>";
       }
     }
 
