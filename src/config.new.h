@@ -1,8 +1,6 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-String VER = "1.0";
-
 const char* ssid = "xxx";
 const char* password = "xxx";
 
