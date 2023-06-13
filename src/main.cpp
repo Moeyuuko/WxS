@@ -36,7 +36,7 @@
 #include <ESP8266WebServer.h>
 
 
-String VER = "2.1";
+String VER = "2.2";
 
 
 ESP8266WebServer webserver(80);
