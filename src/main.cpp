@@ -34,6 +34,11 @@
 #include "config.h"
 
 #include <ESP8266WebServer.h>
+
+
+String VER = "2.1";
+
+
 ESP8266WebServer webserver(80);
 void startWebServer();
 String urlDecode(String input);
