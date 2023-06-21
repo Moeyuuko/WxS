@@ -379,12 +379,17 @@ void JD_Refresh(int JDX) {
   case JD2:i = 1;break;
   default:break;
   }
-  float OFF_v_f,ON_v_f;
+
+  Serial.print("JD_Refresh: JDX="); Serial.print(JDX);
+  Serial.print(" i="); Serial.print(i);
+  
+  float OFF_v_f,ON_v_f,OFF_lx_f,ON_lx_f;
   switch (EEPROM.read(address + i))
   {
   case 0:if (digitalRead(JDX) != HIGH){digitalWrite(JDX, HIGH);}break;
   case 1:if (digitalRead(JDX) != LOW){digitalWrite(JDX, LOW);}break;
   case 2:
+    Serial.print(" mode=2");
     EEPROM.get(address + 20,OFF_v_f);
     EEPROM.get(address + 30,ON_v_f);
     if (Battery_Voltage <= OFF_v_f){ //off
@@ -393,20 +398,29 @@ void JD_Refresh(int JDX) {
     {
       if (digitalRead(JDX) != LOW){digitalWrite(JDX, LOW);};
     }
+    Serial.print(" Battery_Voltage="); Serial.print(Battery_Voltage);
+    Serial.print(" OFF_v_f="); Serial.print(OFF_v_f);
+    Serial.print(" ON_v_f="); Serial.print(ON_v_f);
     break;
   case 3:
-    EEPROM.get(address + 20,OFF_v_f);
-    EEPROM.get(address + 30,ON_v_f);
-    if (BH1750_Lx <= OFF_v_f){ //off
+    Serial.print(" mode=3");
+    EEPROM.get(address + 40,OFF_lx_f);
+    EEPROM.get(address + 50,ON_lx_f);
+    if (BH1750_Lx <= OFF_lx_f){ //off
       if (digitalRead(JDX) != HIGH){digitalWrite(JDX, HIGH);};
-    }else if (BH1750_Lx >= ON_v_f) //on
+    }else if (BH1750_Lx >= ON_lx_f) //on
     {
       if (digitalRead(JDX) != LOW){digitalWrite(JDX, LOW);};
     }
+    Serial.print(" BH1750_Lx="); Serial.print(BH1750_Lx);
+    Serial.print(" OFF_lx_f="); Serial.print(OFF_lx_f);
+    Serial.print(" ON_lx_f="); Serial.print(ON_lx_f);
     break;
 
   default:break;
   }
+  Serial.println(" =OK=");
+
 }
 
 bool isNumeric(String str) {
