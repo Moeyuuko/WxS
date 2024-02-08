@@ -582,8 +582,8 @@ void setup() {
   int value;
   for (int i = 0; i < 2; i++) {
     value = EEPROM.read(address + i);
-    if (value == 255 || value > 2) {
-      EEPROM.write(address + i, 2);
+    if (value == 255 || value > 3) {
+      EEPROM.write(address + i, 0);
     }
   }
 
@@ -595,10 +595,10 @@ void setup() {
     EEPROM.put(address + 30, 12);
   }
   if (!EEPROM.get(address + 40, value_f)) { //初始关亮度
-    EEPROM.put(address + 40, 0);
+    EEPROM.put(address + 40, 100);
   }
   if (!EEPROM.get(address + 50, value_f)) { //初始开亮度
-    EEPROM.put(address + 50, 1);
+    EEPROM.put(address + 50, 250);
   }
 
   EEPROM.commit();
@@ -754,7 +754,7 @@ void startWebServer() {
 
     String JDstatus = 
     "opi_opt = %d\n"
-    "cam_opt = %d\n"
+    "fan_opt = %d\n"
   ;
   char buffer[50];
   sprintf(buffer, JDstatus.c_str(), EEPROM.read(address + 0), EEPROM.read(address + 1));
@@ -796,8 +796,8 @@ void startWebServer() {
           "<option value=\"auto-v\">自动电压</option>"
           "<option value=\"auto-lx\">自动亮度</option>"
         "</select><br>"
-      "<label for=\"cam_opt\">Camera：</label>"
-        "<select id=\"cam_opt\" name=\"cam_opt\" style=\"width: 2.8cm;\">"
+      "<label for=\"fan_opt\">Fan：</label>"
+        "<select id=\"fan_opt\" name=\"fan_opt\" style=\"width: 2.8cm;\">"
           "<option value=\"off\">===关===</option>"
           "<option value=\"on\">===开===</option>"
           "<option value=\"auto-v\">自动电压</option>"
@@ -832,8 +832,8 @@ void startWebServer() {
     "<script>"
       "const my_opi_opt = document.getElementById(\"opi_opt\");\n"
       "my_opi_opt.options[%d].selected = true;"
-      "const my_cam_opt = document.getElementById(\"cam_opt\");\n"
-      "my_cam_opt.options[%d].selected = true;\n"
+      "const my_fan_opt = document.getElementById(\"fan_opt\");\n"
+      "my_fan_opt.options[%d].selected = true;\n"
       "document.getElementById(\"off_v\").value = %.3f;\n"
       "document.getElementById(\"on_v\").value = %.3f;\n"
       "document.getElementById(\"off_lx\").value = %.3f;\n"
@@ -861,7 +861,7 @@ void startWebServer() {
   });
   webserver.on("/gupset", [](){
     String opi_opt = urlDecode(webserver.arg("opi_opt"));
-    String cam_opt = urlDecode(webserver.arg("cam_opt"));
+    String fan_opt = urlDecode(webserver.arg("fan_opt"));
     String off_v_str = webserver.arg("off_v");
     String on_v_str = webserver.arg("on_v");
     String off_lx_str = webserver.arg("off_lx");
@@ -888,21 +888,21 @@ void startWebServer() {
       }
 
     i = 1;
-    if (cam_opt != ""){
-      if (cam_opt == "off") {
+    if (fan_opt != ""){
+      if (fan_opt == "off") {
         EEPROM.write(address + i, 0);
-      } else if (cam_opt == "on") {
+      } else if (fan_opt == "on") {
         EEPROM.write(address + i, 1);
-      } else if (cam_opt == "auto-v") {
+      } else if (fan_opt == "auto-v") {
         EEPROM.write(address + i, 2);
-      } else if (cam_opt == "auto-lx") {
+      } else if (fan_opt == "auto-lx") {
         EEPROM.write(address + i, 3);
       } else {
         EEPROM.write(address + i, 1);
       }
       EEPROM.commit();
       JD_Refresh(JD2);
-      s += "<p>cam_opt: " + cam_opt + "</p>";
+      s += "<p>fan_opt: " + fan_opt + "</p>";
     }
     
 ///////////////电压
