@@ -36,7 +36,7 @@
 #include <ESP8266WebServer.h>
 
 
-String VER = "2.3";
+String VER = "2.4";
 
 
 ESP8266WebServer webserver(80);
@@ -952,6 +952,12 @@ void startWebServer() {
 
     webserver.send(200, "text/html", makePage("set", s+js));
   });
+  webserver.on("/reboot", [](){
+    webserver.send(200, "text/html", makePage("reboot", "reboot"));
+    WiFi.disconnect();
+    ESP.restart();
+  });
+  
   webserver.begin(); 
   Serial.println("OK");
 }
