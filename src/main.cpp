@@ -56,7 +56,7 @@ float Battery_Voltage = 0;
 float BH1750_Lx = 0;
 
 // 继电器参数
-const int JD1 = D5;
+const int JD1 = D7; //#D5
 const int JD2 = D6;
 const int address = 0; //EEPROM地址
 
@@ -764,6 +764,8 @@ void startWebServer() {
   s += "<h1>WxS-info --- Version: " + String(VER) + "</h1>";
   s += "<p>now_get_time: " + time + "</p>";
   s += "<p>last_post_time: " + last_post_time + "</p>";
+  s += "<h2>WIFIstatus</h2>";
+  s += "<p style=\"white-space: pre-line;\">Signal_strength: " + String(WiFi.RSSI()) + "dBm</p>";
   s += "<h2>JDstatus</h2>";
   s += "<p style=\"white-space: pre-line;\">" + JDstatus + "</p>";
   s += "<p style=\"white-space: pre-line;\">Battery_Voltage: " + String(Battery_Voltage) + " V</p>";
