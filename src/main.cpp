@@ -588,11 +588,11 @@ void setup() {
   }
 
   if (EEPROM.read(address + 100) != 78){ //检测是否是第一次刷入 无意义数值
-    EEPROM.put(address + 20, 11.1);
-    EEPROM.put(address + 30, 12);
-    EEPROM.put(address + 40, 100);
-    EEPROM.put(address + 50, 250);
-    EEPROM.put(address + 100, 78);
+    EEPROM.put(address + 20, 11.1); //初始关电压
+    EEPROM.put(address + 30, 12);  //初始开电压
+    EEPROM.put(address + 40, 100); //初始关亮度
+    EEPROM.put(address + 50, 250);{ //初始开亮度
+    EEPROM.put(address + 100, 78); //写入无意义数值 在下次不再初始化
     EEPROM.commit();
   }
 
