@@ -954,6 +954,7 @@ void startWebServer() {
   });
   webserver.on("/reboot", [](){
     webserver.send(200, "text/html", makePage("reboot", "reboot"));
+    delay(1000);
     WiFi.disconnect();
     ESP.restart();
   });
