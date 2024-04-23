@@ -451,10 +451,17 @@ void setup() {
   WiFi.mode(WIFI_STA);
 
   WiFi.setHostname(hostname);
-  WiFi.begin(ssid, password);
+  WiFi.begin(ssid[0], password[0]);
 
-  while (WiFi.waitForConnectResult() != WL_CONNECTED) {
+  if (WiFi.waitForConnectResult() != WL_CONNECTED) {
+    Serial.println("Connection Failed! Connect to the 2nd ssid..");
+    WiFi.disconnect();
+    WiFi.begin(ssid[1], password[1]);
+  }
+
+  if (WiFi.waitForConnectResult() != WL_CONNECTED) {
     Serial.println("Connection Failed! Rebooting...");
+    WiFi.disconnect();
     delay(5000);
     ESP.restart();
   }
@@ -591,7 +598,7 @@ void setup() {
     EEPROM.put(address + 20, 11.1); //初始关电压
     EEPROM.put(address + 30, 12);  //初始开电压
     EEPROM.put(address + 40, 100); //初始关亮度
-    EEPROM.put(address + 50, 250);{ //初始开亮度
+    EEPROM.put(address + 50, 250); //初始开亮度
     EEPROM.put(address + 100, 78); //写入无意义数值 在下次不再初始化
     EEPROM.commit();
   }
@@ -615,7 +622,7 @@ void setup() {
 void loop() {
     // put your main code here, to run repeatedly:
 
-  while (WiFi.waitForConnectResult() != WL_CONNECTED) {
+  if (WiFi.waitForConnectResult() != WL_CONNECTED) {
     Serial.println("Connection Failed! Rebooting...");
     delay(5000);
     ESP.restart();
@@ -758,7 +765,10 @@ void startWebServer() {
   s += "<p>now_get_time: " + time + "</p>";
   s += "<p>last_post_time: " + last_post_time + "</p>";
   s += "<h2>WIFIstatus</h2>";
-  s += "<p style=\"white-space: pre-line;\">Signal_strength: " + String(WiFi.RSSI()) + "dBm</p>";
+  s += "<p style=\"white-space: pre-line;\">SSID: " + String(WiFi.SSID()) + "</p>";
+  s += "<p style=\"white-space: pre-line;\">RSSI: " + String(WiFi.RSSI()) + "dBm</p>";
+  s += "<p style=\"white-space: pre-line;\">BSSID: " + String(WiFi.BSSIDstr()) + "</p>";
+  s += "<p style=\"white-space: pre-line;\">channel: " + String(WiFi.channel()) + "</p>";
   s += "<h2>JDstatus</h2>";
   s += "<p style=\"white-space: pre-line;\">" + JDstatus + "</p>";
   s += "<p style=\"white-space: pre-line;\">Battery_Voltage: " + String(Battery_Voltage) + " V</p>";
