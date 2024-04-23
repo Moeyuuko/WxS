@@ -36,7 +36,7 @@
 #include <ESP8266WebServer.h>
 
 
-String VER = "2.2";
+String VER = "2.3";
 
 
 ESP8266WebServer webserver(80);
@@ -587,21 +587,14 @@ void setup() {
     }
   }
 
-  float value_f;
-  if (!EEPROM.get(address + 20, value_f)) { //初始关电压
+  if (EEPROM.read(address + 100) != 78){ //检测是否是第一次刷入 无意义数值
     EEPROM.put(address + 20, 11.1);
-  }
-  if (!EEPROM.get(address + 30, value_f)) { //初始开电压
     EEPROM.put(address + 30, 12);
-  }
-  if (!EEPROM.get(address + 40, value_f)) { //初始关亮度
     EEPROM.put(address + 40, 100);
-  }
-  if (!EEPROM.get(address + 50, value_f)) { //初始开亮度
     EEPROM.put(address + 50, 250);
+    EEPROM.put(address + 100, 78);
+    EEPROM.commit();
   }
-
-  EEPROM.commit();
 
   if (EEPROM.read(address + 0) == 1){
     digitalWrite(JD1, LOW);
