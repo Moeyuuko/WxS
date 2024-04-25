@@ -594,12 +594,12 @@ void setup() {
     }
   }
 
-  if (EEPROM.read(address + 100) != 78){ //检测是否是第一次刷入 无意义数值
-    EEPROM.put(address + 20, 11.1); //初始关电压
-    EEPROM.put(address + 30, 12);  //初始开电压
-    EEPROM.put(address + 40, 100); //初始关亮度
-    EEPROM.put(address + 50, 250); //初始开亮度
-    EEPROM.put(address + 100, 78); //写入无意义数值 在下次不再初始化
+  if (EEPROM.read(address + 100) != float(233)){ //检测是否是第一次刷入 无意义数值
+    EEPROM.put(address + 20, float(11.1)); //初始关电压
+    EEPROM.put(address + 30, float(12));  //初始开电压
+    EEPROM.put(address + 40, float(100)); //初始关亮度
+    EEPROM.put(address + 50, float(250)); //初始开亮度
+    EEPROM.put(address + 100, float(233)); //写入无意义数值 在下次不再初始化
     EEPROM.commit();
   }
 
@@ -955,6 +955,20 @@ void startWebServer() {
   webserver.on("/reboot", [](){
     webserver.send(200, "text/html", makePage("reboot", "reboot"));
     delay(1000);
+    WiFi.disconnect();
+    ESP.restart();
+  });
+  webserver.on("/reset", [](){
+    EEPROM.put(address + 100, float(000));
+    EEPROM.commit();
+    String s = "<h1>reset OK</h1>";
+    String js = 
+    "<script type=\"text/javascript\">"
+      "setTimeout(function(){window.location.href = \"/gpio\";}, 5000);"
+    "</script>"
+    ;
+    webserver.send(200, "text/html", makePage("reset", s+js));
+    delay(2000);
     WiFi.disconnect();
     ESP.restart();
   });
