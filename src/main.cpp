@@ -300,6 +300,14 @@ String BMP180_read(int timestamp){
   return result;
 }
 
+String wifistatus_read(int timestamp){
+  Serial.println("wifistatus_read..");
+  String result = "";
+  String RSSI = String(WiFi.RSSI());
+  result =  "Wifi,tag=RSSI RSSI=" + RSSI + " " + timestamp + "\n";
+  return result;
+}
+
 void i2c_Scanning() {
   byte error, address;
   int deviceCount = 0;
@@ -696,8 +704,9 @@ void loop() {
   String BH1750_Data = BH1750_read(now);
   String INA226_41 = INA226_read(now,0x41);
   String INA226_44 = INA226_read(now,0x44);
+  String WIFI_Data = wifistatus_read(now);
 
-  postData = HTU21D_Data + BMP180_Data + BH1750_Data + INA226_41 + INA226_44;
+  postData = HTU21D_Data + BMP180_Data + BH1750_Data + INA226_41 + INA226_44 + WIFI_Data;
   Serial.println(postData);
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
